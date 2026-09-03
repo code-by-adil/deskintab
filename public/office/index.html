@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Documents — ZetaOffice Writer</title>
+		<style>
+			html,
+			body {
+				margin: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: #e7e7e7;
+			}
+			#qtcanvas {
+				display: block;
+				width: 100%;
+				height: 100%;
+				border: 0;
+				padding: 0;
+				outline: none;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas
+			id="qtcanvas"
+			contenteditable="true"
+			aria-label="Office document editor"
+			oncontextmenu="event.preventDefault()"
+			onkeydown="event.preventDefault()"
+		></canvas>
+		<script>
+			const bootstrap = document.createElement('script');
+			bootstrap.onerror = () =>
+				window.parent.postMessage(
+					{
+						source: 'desktop-office',
+						type: 'error',
+						message: 'Could not load the Office bootstrap. Try again.',
+					},
+					location.origin,
+				);
+			bootstrap.src = './bootstrap.js' + location.search;
+			document.body.append(bootstrap);
+		</script>
+	</body>
+</html>

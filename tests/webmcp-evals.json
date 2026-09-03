@@ -1,0 +1,423 @@
+[
+	{
+		"name": "Inspect a project folder",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "List the files in /Projects/Launch."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "files_list",
+				"arguments": {
+					"path": "/Projects/Launch"
+				}
+			}
+		]
+	},
+	{
+		"name": "Resolve the human selection",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "What task or file do I have selected on the desktop? Inspect the current selection without opening or saving anything."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "desktop_get_context",
+				"arguments": {}
+			}
+		]
+	},
+	{
+		"name": "Read the current note draft",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Read this Notepad note, including my unsaved text and selected passage."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "notes_get_context",
+				"arguments": {}
+			}
+		]
+	},
+	{
+		"name": "Read saved text",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Read the saved text of /Projects/Launch/brief.md."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "files_read",
+				"arguments": {
+					"path": "/Projects/Launch/brief.md"
+				}
+			}
+		]
+	},
+	{
+		"name": "Read a task list",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Read the tasks in /Documents/Launch.tasks.json and show their evidence links."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "tasks_list",
+				"arguments": {
+					"path": "/Documents/Launch.tasks.json"
+				}
+			}
+		]
+	},
+	{
+		"name": "Read an editable diagram",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Read /Documents/Plan.excalidraw and include an image of the diagram."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "canvas_read",
+				"arguments": {
+					"path": "/Documents/Plan.excalidraw",
+					"includeImage": true
+				}
+			}
+		]
+	},
+	{
+		"name": "Read an office document",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Read /Documents/Report.docx, including its current revision and paragraph styles."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "documents_read",
+				"arguments": {
+					"path": "/Documents/Report.docx"
+				}
+			}
+		]
+	},
+	{
+		"name": "Read workbook cells",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Read A1:D12 on the Costs sheet of /Documents/Budget.xlsx, including formulas and calculated values."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "sheets_read",
+				"arguments": {
+					"path": "/Documents/Budget.xlsx",
+					"sheet": "Costs",
+					"range": "A1:D12"
+				}
+			}
+		]
+	},
+	{
+		"name": "Read a scanned source page",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Show me an image of physical page 3 of /Documents/Source.pdf so I can inspect the scanned page."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "preview_read",
+				"arguments": {
+					"path": "/Documents/Source.pdf",
+					"page": 3,
+					"includeImage": true
+				}
+			}
+		]
+	},
+	{
+		"name": "Find source pages",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Search /Documents/Source.pdf for the phrase delivery schedule."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "preview_search",
+				"arguments": {
+					"path": "/Documents/Source.pdf",
+					"query": "delivery schedule"
+				}
+			}
+		]
+	},
+	{
+		"name": "Inspect saved changes",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "List saved changes for /Projects/Launch/brief.md that I can review."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "review_list",
+				"arguments": {
+					"path": "/Projects/Launch/brief.md"
+				}
+			}
+		]
+	},
+	{
+		"name": "List background work",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "List the running Terminal jobs so I can choose which output to inspect."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "terminal_jobs",
+				"arguments": {
+					"status": "running"
+				}
+			}
+		]
+	},
+	{
+		"name": "Create a folder",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Create /Projects/Launch/Archive, including missing parent folders."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "files_mkdir",
+				"arguments": {
+					"path": "/Projects/Launch/Archive"
+				}
+			}
+		]
+	},
+	{
+		"name": "Copy meeting notes",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Copy /Projects/Launch/meeting-notes.md to /Projects/Launch/Archive/handoff-notes.md. Preserve any existing destination."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "files_copy",
+				"arguments": {
+					"source": "/Projects/Launch/meeting-notes.md",
+					"destination": "/Projects/Launch/Archive/handoff-notes.md"
+				}
+			}
+		]
+	},
+	{
+		"name": "Run a specified command",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Run this short Terminal command from /Projects/Launch: grep -R -n WebMCP ."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "terminal_run",
+				"arguments": {
+					"command": "grep -R -n WebMCP .",
+					"cwd": "/Projects/Launch"
+				}
+			}
+		]
+	},
+	{
+		"name": "Create and show specified text",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Create /Projects/Launch/eval-status.md with exactly this text: \"The report is ready.\" Preserve any existing file, then open the new file for me."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "files_write",
+				"arguments": {
+					"path": "/Projects/Launch/eval-status.md",
+					"content": "The report is ready.",
+					"createOnly": true
+				},
+				"mockOutput": {
+					"content": [
+						{
+							"type": "text",
+							"text": "Created /Projects/Launch/eval-status.md."
+						}
+					],
+					"structuredContent": {
+						"ok": true,
+						"entry": {
+							"path": "/Projects/Launch/eval-status.md",
+							"kind": "file"
+						},
+						"created": true,
+						"revision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"saved": true,
+						"displayed": false
+					}
+				}
+			},
+			{
+				"functionName": "desktop_reveal",
+				"arguments": {
+					"path": "/Projects/Launch/eval-status.md"
+				}
+			}
+		]
+	},
+	{
+		"name": "Use the read revision for a focused edit",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Read /Projects/Launch/todo.md so we can mark its report task complete."
+			},
+			{
+				"role": "model",
+				"type": "functioncall",
+				"name": "files_read",
+				"arguments": {
+					"path": "/Projects/Launch/todo.md"
+				}
+			},
+			{
+				"role": "user",
+				"type": "functionresponse",
+				"name": "files_read",
+				"response": {
+					"structuredContent": {
+						"ok": true,
+						"path": "/Projects/Launch/todo.md",
+						"content": "- [ ] Prepare a status report\n",
+						"revision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"startLine": 1,
+						"endLine": 2,
+						"totalLines": 2,
+						"truncated": false
+					}
+				}
+			},
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Now mark that task complete with an exact text patch guarded by the revision you just read."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "files_patch",
+				"arguments": {
+					"path": "/Projects/Launch/todo.md",
+					"find": "- [ ] Prepare a status report",
+					"replace": "- [x] Prepare a status report",
+					"expectedRevision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+				}
+			}
+		]
+	},
+	{
+		"name": "Follow the returned Terminal job",
+		"messages": [
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Start this background command from /Projects/Launch: find . -name \"*.md\" -print"
+			},
+			{
+				"role": "model",
+				"type": "functioncall",
+				"name": "terminal_start",
+				"arguments": {
+					"command": "find . -name \"*.md\" -print",
+					"cwd": "/Projects/Launch"
+				}
+			},
+			{
+				"role": "user",
+				"type": "functionresponse",
+				"name": "terminal_start",
+				"response": {
+					"structuredContent": {
+						"ok": true,
+						"job": {
+							"id": "eval-job-1",
+							"status": "running",
+							"revision": 2,
+							"stdout": "",
+							"stderr": "",
+							"exitCode": null
+						}
+					}
+				}
+			},
+			{
+				"role": "user",
+				"type": "message",
+				"content": "Wait for this job to change or finish using its latest revision."
+			}
+		],
+		"expectedCall": [
+			{
+				"functionName": "terminal_wait",
+				"arguments": {
+					"jobId": "eval-job-1",
+					"afterRevision": 2
+				}
+			}
+		]
+	}
+]

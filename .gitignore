@@ -1,0 +1,24 @@
+/node_modules/
+/dist/
+/.vscode/
+.DS_Store
+.idea/
+.wrangler/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+/playwright-report/
+/test-results/
+
+# Local agent guidance, tooling, and visual references
+AGENTS.md
+/.agents/
+/.codex/
+/docs/references/
+
+/public/office/runtime/
+public/excalidraw/fonts/
