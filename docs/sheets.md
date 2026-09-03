@@ -1,6 +1,6 @@
 # Sheets
 
-Sheets edits ODS/XLSX workbooks with ZetaOffice Calc. People use its grid, formula bar, sheet tabs, and formatting controls. Agents use five WebMCP tools that edit the same live workbook and save it to the workspace.
+Sheets edits ODS/XLSX workbooks with ZetaOffice Calc. People use its grid, formula bar, sheet tabs, and formatting controls. Agents use six WebMCP tools that edit the same live workbook and save it to the workspace.
 
 ## Human workflow
 
@@ -18,8 +18,8 @@ Export creates a new ODS, XLSX or PDF while retaining the editable source. Expor
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sheets_create` | `path` and 1 to 8 named `sheets`, each with a rectangular `values` matrix. Creates, opens and saves an ODS/XLSX; returns the workspace entry.                                                                                         |
 | `sheets_read`   | Optional `path`, `sheet`, `range`. Defaults to the open workbook, active sheet, and `A1:J30`. Returns `workbook` with path, revision, sheet names, requested range, cells, human selection, chart names/source ranges and truncation. |
-| `sheets_edit`   | `path`, fresh `expectedRevision`, and one `operation`: `cells` or `format`. Recalculates, selects the edited range, and saves before returning.                                                                                       |
-| `sheets_chart`  | `path`, fresh `expectedRevision`, optional `sheet`, `range`, unique `name`, optional `title`. Inserts a linked column chart and saves.                                                                                                |
+| `sheets_edit`   | `path`, fresh `expectedRevision`, and one operation for cells, formatting, sheets, rows/columns, sorting, filtering or merging. Recalculates, selects the edited range, and saves before returning.                                   |
+| `sheets_chart`  | `path`, fresh `expectedRevision`, optional `sheet`, `range`, unique `name`, optional `title`. Creates, updates or removes a linked chart and saves.                                                                                   |
 | `sheets_export` | `path`, new `destination`. Extension selects ODS/XLSX/PDF; PNG also requires `sheet` and `chart` names from a read. Returns the saved entry.                                                                                          |
 
 Cells accept numbers, literal strings, `null` to clear, or a formula object. A string beginning with `=` stays text; formulas are never inferred from imported prose. Example creation:
@@ -79,3 +79,9 @@ Each open Office app has its own iframe, engine, and temporary import/export fil
 `tests/sheets.spec.ts` runs the actual WASM engine, replacing only tool registration. It covers formulas, revision rejection, invalid inputs, formatting, native keyboard input and undo/redo, close/reopen, multi-sheet calculations, human chart creation, updated PNG exports, report embedding and file persistence. The implementation also had an in-app browser check using discovered WebMCP tools.
 
 The integration was checked against official [ZetaJS examples](https://github.com/allotropia/zetajs/tree/main/examples), LibreOffice [XCell](https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1table_1_1XCell.html), [SheetCellRange](https://api.libreoffice.org/docs/idl/ref/servicecom_1_1sun_1_1star_1_1sheet_1_1SheetCellRange.html), [XSpreadsheetView](https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1sheet_1_1XSpreadsheetView.html), [XTableCharts](https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1table_1_1XTableCharts.html), and [GraphicExportFilter](https://api.libreoffice.org/docs/idl/ref/servicecom_1_1sun_1_1star_1_1drawing_1_1GraphicExportFilter.html). Tools follow the [WebMCP imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api). The browser suite checks these operations against the pinned runtime.
+
+## Workbook structure and navigation
+
+The expanded operations and examples are specified in [the tool contract](webmcp-tool-contract.md#office-continuation-and-structural-editing). `sheets_select` reveals an exact sheet/range at a fresh read revision. `sheets_read` includes row visibility and optional cell formatting.
+
+Sheet edits use [XSpreadsheets](https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1sheet_1_1XSpreadsheets.html), filtering uses [XSheetFilterable](https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1sheet_1_1XSheetFilterable.html), and merging uses [XMergeable](https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1util_1_1XMergeable.html). Sorting uses the native `DataSort` command with explicit scalar arguments from [Calc's command contract](https://github.com/LibreOffice/core/blob/master/sc/sdi/scalc.sdi), because the pinned WASM build does not bind sequences of sort-field structs. It operates on the selected range and keeps formatting with content.

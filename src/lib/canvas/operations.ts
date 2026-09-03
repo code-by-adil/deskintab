@@ -12,7 +12,8 @@ import { readWorkspaceRaster } from '../workspace/raster';
 export type CanvasOperation =
 	| { op: 'add'; object: Record<string, unknown> }
 	| { op: 'update'; id: string; changes: Record<string, unknown> }
-	| { op: 'delete'; id: string };
+	| { op: 'delete'; id: string }
+	| { op: 'reorder'; ids: string[] };
 const fields = new Set([
 	'x',
 	'y',
@@ -25,6 +26,12 @@ const fields = new Set([
 	'strokeColor',
 	'fontSize',
 	'fontFamily',
+	'fillStyle',
+	'strokeStyle',
+	'textAlign',
+	'verticalAlign',
+	'startArrowhead',
+	'endArrowhead',
 	'strokeWidth',
 	'roughness',
 	'opacity',
@@ -74,6 +81,46 @@ function changes(raw: Record<string, unknown>) {
 					: -1_000_000,
 			);
 		if (['fill', 'color', 'backgroundColor', 'strokeColor'].includes(key)) safeColor(value);
+		const styles: Record<string, readonly (string | null)[]> = {
+			fillStyle: ['solid', 'hachure', 'cross-hatch', 'zigzag'],
+			strokeStyle: ['solid', 'dashed', 'dotted'],
+			textAlign: ['left', 'center', 'right'],
+			verticalAlign: ['top', 'middle', 'bottom'],
+			startArrowhead: [
+				null,
+				'arrow',
+				'bar',
+				'dot',
+				'circle',
+				'circle_outline',
+				'triangle',
+				'triangle_outline',
+				'diamond',
+				'diamond_outline',
+				'crowfoot_one',
+				'crowfoot_many',
+				'crowfoot_one_or_many',
+			],
+			endArrowhead: [
+				null,
+				'arrow',
+				'bar',
+				'dot',
+				'circle',
+				'circle_outline',
+				'triangle',
+				'triangle_outline',
+				'diamond',
+				'diamond_outline',
+				'crowfoot_one',
+				'crowfoot_many',
+				'crowfoot_one_or_many',
+			],
+		};
+		if (styles[key] && !styles[key].includes(value as string | null))
+			throw new AppError('INVALID_DATA', `Invalid ${key}; use the canvas_edit schema values.`);
+		if (key === 'fontFamily' && ![1, 2, 3, 5, 6, 7, 8, 9].includes(Number(value)))
+			throw new AppError('INVALID_DATA', 'Use a supported Excalidraw font family ID.');
 		if (key === 'text') boundedText(value, 'Text', 20000, true);
 		if (key === 'locked' && typeof value !== 'boolean')
 			throw new AppError('INVALID_DATA', 'locked must be boolean.');
@@ -102,7 +149,29 @@ export async function applyOperations(
 	for (const raw of operations) {
 		signal?.throwIfAborted();
 		const operation = objectValue(raw);
-		if (operation.op === 'add') {
+		if (operation.op === 'reorder') {
+			const ids = operation.ids;
+			const independent = elements.filter(
+				(element) => element.type !== 'text' || !element.containerId,
+			);
+			if (
+				!Array.isArray(ids) ||
+				ids.length !== independent.length ||
+				new Set(ids).size !== ids.length ||
+				ids.some(
+					(id) => typeof id !== 'string' || !independent.some((element) => element.id === id),
+				)
+			)
+				throw new AppError(
+					'INVALID_DATA',
+					'reorder.ids must list each shape, arrow, image and unbound text ID exactly once, back to front. Bound labels move with their shapes.',
+				);
+			const ordered = (ids as string[]).flatMap((id) => [
+				elements.find((element) => element.id === id)!,
+				...elements.filter((element) => element.type === 'text' && element.containerId === id),
+			]);
+			elements = ordered.map((element) => sdk.newElementWith(element, { index: null }));
+		} else if (operation.op === 'add') {
 			const object = objectValue(operation.object),
 				id = boundedText(object.id, 'ID', 100),
 				type = String(object.type);
@@ -128,6 +197,11 @@ export async function applyOperations(
 				);
 			const { id: _id, type: _type, from, to, imagePath, ...rest } = object;
 			const attrs = changes(rest);
+			if (
+				('startArrowhead' in attrs || 'endArrowhead' in attrs) &&
+				!['arrow', 'connector', 'line'].includes(type)
+			)
+				throw new AppError('INVALID_DATA', 'Arrowheads apply only to lines and arrows.');
 			if ((from !== undefined || to !== undefined) && !['arrow', 'connector'].includes(type))
 				throw new AppError('INVALID_CONNECTOR', 'Only arrows accept from/to shape IDs.');
 			if (imagePath !== undefined && type !== 'image')
@@ -236,7 +310,16 @@ export async function applyOperations(
 					delete skeleton.width;
 					delete skeleton.height;
 				} else if (attrs.text !== undefined) {
-					skeleton.label = { text: attrs.text, fontSize: attrs.fontSize ?? 20 };
+					skeleton.label = {
+						text: attrs.text,
+						fontSize: attrs.fontSize ?? 20,
+						fontFamily: attrs.fontFamily,
+						textAlign: attrs.textAlign,
+						verticalAlign: attrs.verticalAlign,
+					};
+					delete skeleton.fontFamily;
+					delete skeleton.textAlign;
+					delete skeleton.verticalAlign;
 					delete skeleton.text;
 				}
 				const converted = sdk.convertToExcalidrawElements(
@@ -341,9 +424,25 @@ export async function applyOperations(
 			const boundText = elements.find((e) => e.type === 'text' && e.containerId === id) as
 				| ExcalidrawTextElement
 				| undefined;
+			if (
+				('startArrowhead' in attrs || 'endArrowhead' in attrs) &&
+				!['arrow', 'line'].includes(previous.type)
+			)
+				throw new AppError('INVALID_DATA', 'Arrowheads apply only to lines and arrows.');
+			const labelStyles: Record<string, unknown> = {};
+			if (previous.type !== 'text')
+				for (const key of ['fontFamily', 'textAlign', 'verticalAlign']) {
+					if (key in attrs) {
+						labelStyles[key] = attrs[key];
+						delete attrs[key];
+					}
+				}
 			const labelFontSize = attrs.fontSize;
 			let text = attrs.text;
-			if (previous.type !== 'text' && labelFontSize !== undefined) {
+			if (
+				previous.type !== 'text' &&
+				(labelFontSize !== undefined || Object.keys(labelStyles).length)
+			) {
 				if (text === undefined && boundText) text = boundText.originalText;
 				if (text === undefined)
 					throw new AppError('INVALID_DATA', 'Add label text before setting its font size.');
@@ -435,6 +534,7 @@ export async function applyOperations(
 												angle: oldLabel.angle,
 											}
 										: {}),
+									...labelStyles,
 								},
 							},
 						] as Parameters<typeof sdk.convertToExcalidrawElements>[0],
@@ -462,7 +562,7 @@ export async function applyOperations(
 						'This element cannot contain text. Add a separate text element.',
 					);
 			}
-		} else throw new AppError('INVALID_DATA', 'Use add, update, or delete.');
+		} else throw new AppError('INVALID_DATA', 'Use add, update, delete, or reorder.');
 	}
 	// The public exporter loads Excalidraw's subset fonts without mounting React.
 	// Warm those fonts before measuring text, otherwise a first agent edit uses

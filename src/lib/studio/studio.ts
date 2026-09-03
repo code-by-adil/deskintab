@@ -1,3 +1,4 @@
+import { studioViewContext } from './view';
 import { AppError } from '../errors';
 import type { ActivityActor } from '../activity/activity';
 import {
@@ -31,6 +32,8 @@ export type StudioFile = StudioInput & {
 export type StudioRow = Record<string, string | number | boolean | null>;
 export type StudioSource = { path: string; exists: boolean };
 export type StudioPreview = {
+	app: StudioFile;
+	rows: StudioRow[];
 	path: string;
 	manifestRevision: string;
 	dataRevision: string;
@@ -343,6 +346,8 @@ async function preview(path: string): Promise<StudioPreview> {
 		rowCount: data.rows.length,
 		sources,
 		token,
+		app: record.data,
+		rows: data.rows,
 		srcdoc: renderExplorer(record.data, data.rows, sources, token),
 	};
 }
@@ -423,6 +428,7 @@ async function createStarter() {
 	return result;
 }
 export const studioService = {
+	context: studioViewContext,
 	document: studioDocument,
 	list,
 	read,

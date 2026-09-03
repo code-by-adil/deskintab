@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { AppError } from '🍎/lib/errors';
+	import { connectAppNavigation } from '🍎/lib/desktop/navigation';
+
 	import WindowSheet from '🍎/components/SystemUI/WindowSheet.svelte';
 	import { onMount, tick } from 'svelte';
 	import FolderIcon from '~icons/mdi/folder-open-outline';
@@ -343,6 +346,33 @@
 			clearPendingGuard();
 		};
 	});
+	onMount(() =>
+		connectAppNavigation('tasks', {
+			ready: () => !record.loading,
+			read: () => ({
+				path: record.path,
+				taskId: draft?.id ?? null,
+				filter,
+				visibleTaskIds: visibleTasks.map((task) => task.id),
+				busy,
+			}),
+			navigate: ({ taskId, filter: nextFilter }) => {
+				if (busy || !guardNavigation())
+					throw new AppError('UNSAVED_EDITS', error || 'Wait for Tasks to finish loading.');
+				const task = taskId === undefined ? undefined : tasks.find((item) => item.id === taskId);
+				if (taskId !== undefined && !task)
+					throw new AppError(
+						'TASK_NOT_FOUND',
+						'Read this task list to choose an existing task ID.',
+					);
+				if (task && nextFilter && nextFilter !== 'all' && task.status !== nextFilter)
+					throw new AppError('INVALID_INPUT', 'The selected task does not match this filter.');
+				if (nextFilter !== undefined) filter = nextFilter;
+				else if (task && filter !== 'all' && task.status !== filter) filter = 'all';
+				if (task) chooseTask(task);
+			},
+		}),
+	);
 </script>
 
 <section class="tasks-shell" aria-label="Tasks">

@@ -1,20 +1,67 @@
 import { AppError } from '../errors';
 export type CellInput = string | number | null | { formula: string };
 export type WorkbookSheet = { name: string; values: CellInput[][] };
-export type RangeInput = { sheet?: string; range?: string };
+export type RangeInput = { sheet?: string; range?: string; includeFormatting?: boolean };
 export type SheetOperation =
+	| {
+			type: 'sheet';
+			action: 'add' | 'rename' | 'remove' | 'move';
+			sheet?: string;
+			name?: string;
+			index?: number;
+	  }
+	| {
+			type: 'structure';
+			sheet?: string;
+			axis: 'rows' | 'columns';
+			action: 'insert' | 'remove';
+			index: number;
+			count: number;
+	  }
+	| {
+			type: 'sort';
+			sheet?: string;
+			range: string;
+			column: number;
+			ascending: boolean;
+			header: boolean;
+	  }
+	| {
+			type: 'filter';
+			sheet?: string;
+			range: string;
+			column: number;
+			value: string | number | null;
+			header: boolean;
+	  }
+	| { type: 'merge'; sheet?: string; range: string; merge: boolean }
 	| { type: 'cells'; sheet?: string; range: string; values: CellInput[][] }
 	| {
 			type: 'format';
 			sheet?: string;
 			range: string;
 			bold?: boolean;
+			italic?: boolean;
+			underline?: boolean;
+			fontSize?: number;
+			fontName?: string;
+			wrap?: boolean;
+			align?: 'left' | 'center' | 'right';
+			columnWidthMm?: number;
+			rowHeightMm?: number;
 			background?: string;
 			color?: string;
 			numberFormat?: string;
 			autoFit?: boolean;
 	  };
-export type SheetChart = { sheet?: string; range: string; name: string; title?: string };
+export type SheetChart = {
+	sheet?: string;
+	range?: string;
+	name: string;
+	title?: string;
+	action: 'create' | 'update' | 'remove';
+	kind?: 'column' | 'bar' | 'line' | 'pie' | 'area';
+};
 
 function invalid(message: string): never {
 	throw new AppError('INVALID_INPUT', message);
@@ -105,15 +152,90 @@ function scope(input: Record<string, unknown>) {
 }
 export function rangeInput(value: unknown): RangeInput {
 	const input = object(value);
+	if (input.includeFormatting !== undefined && typeof input.includeFormatting !== 'boolean')
+		invalid('includeFormatting must be boolean.');
 	return {
 		...scope(input),
+		includeFormatting: input.includeFormatting as boolean | undefined,
 		...(input.range !== undefined ? { range: sheetRange(input.range).range } : {}),
 	};
 }
 export function sheetOperation(value: unknown): SheetOperation {
 	const input = object(value),
-		target = scope(input),
-		range = sheetRange(input.range);
+		target = scope(input);
+	const integer = (key: string, max: number, fallback?: number) => {
+		const n = input[key] ?? fallback;
+		if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > max)
+			invalid(`Invalid ${key}.`);
+		return n;
+	};
+	const bool = (key: string, fallback: boolean) => {
+		const b = input[key] ?? fallback;
+		if (typeof b !== 'boolean') invalid(`Invalid ${key}.`);
+		return b;
+	};
+	if (input.type === 'sheet') {
+		if (!['add', 'rename', 'remove', 'move'].includes(String(input.action)))
+			invalid('Unknown sheet action.');
+		const action = input.action as 'add' | 'rename' | 'remove' | 'move';
+		return {
+			type: 'sheet',
+			action,
+			...target,
+			...(['add', 'rename'].includes(action) ? { name: sheetName(input.name) } : {}),
+			...(['add', 'move'].includes(action)
+				? { index: integer('index', 1000, action === 'add' ? 0 : undefined) }
+				: {}),
+		};
+	}
+	if (input.type === 'structure') {
+		if (
+			!['rows', 'columns'].includes(String(input.axis)) ||
+			!['insert', 'remove'].includes(String(input.action))
+		)
+			invalid('Choose rows/columns and insert/remove.');
+		const count = integer('count', 100);
+		if (!count) invalid('count must be positive.');
+		return {
+			type: 'structure',
+			...target,
+			axis: input.axis as 'rows' | 'columns',
+			action: input.action as 'insert' | 'remove',
+			index: integer('index', input.axis === 'rows' ? 1048575 : 16383),
+			count,
+		};
+	}
+	const range = sheetRange(input.range);
+	if (input.type === 'sort')
+		return {
+			type: 'sort',
+			...target,
+			range: range.range,
+			column: integer('column', range.columns - 1),
+			ascending: bool('ascending', true),
+			header: bool('header', true),
+		};
+	if (input.type === 'filter') {
+		const value = input.value;
+		if (
+			value !== null &&
+			typeof value !== 'string' &&
+			(typeof value !== 'number' || !Number.isFinite(value))
+		)
+			invalid('Filter value must be text or number, or null to clear.');
+		if (typeof value === 'string' && value.length > 10000) invalid('Filter value is too long.');
+		return {
+			type: 'filter',
+			...target,
+			range: range.range,
+			column: integer('column', range.columns - 1, 0),
+			value: value as string | number | null,
+			header: bool('header', true),
+		};
+	}
+	if (input.type === 'merge')
+		return { type: 'merge', ...target, range: range.range, merge: bool('merge', true) };
+
 	if (input.type === 'cells') {
 		const values = cellValues(input.values);
 		if (values.length !== range.rows || values[0].length !== range.columns)
@@ -122,6 +244,24 @@ export function sheetOperation(value: unknown): SheetOperation {
 	}
 	if (input.type !== 'format') invalid('Use a cells or format operation.');
 	const style: Omit<Extract<SheetOperation, { type: 'format' }>, 'type' | 'range'> = {};
+	for (const key of ['italic', 'underline', 'wrap'] as const)
+		if (input[key] !== undefined) style[key] = bool(key, false);
+	for (const key of ['fontSize', 'columnWidthMm', 'rowHeightMm'] as const)
+		if (input[key] !== undefined) {
+			const n = input[key];
+			if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0 || n > 500)
+				invalid(`Invalid ${key}.`);
+			style[key] = n;
+		}
+	if (input.fontName !== undefined) {
+		if (typeof input.fontName !== 'string' || !input.fontName.trim() || input.fontName.length > 200)
+			invalid('Invalid fontName.');
+		style.fontName = input.fontName;
+	}
+	if (input.align !== undefined) {
+		if (!['left', 'center', 'right'].includes(String(input.align))) invalid('Invalid alignment.');
+		style.align = input.align as 'left' | 'center' | 'right';
+	}
 	if (input.bold !== undefined) {
 		if (typeof input.bold !== 'boolean') invalid('bold must be true or false.');
 		style.bold = input.bold;
@@ -151,17 +291,37 @@ export function sheetOperation(value: unknown): SheetOperation {
 export function sheetChart(value: unknown): SheetChart {
 	const input = object(value),
 		target = scope(input),
-		{ range, rows, columns } = sheetRange(input.range);
-	if (rows < 2 || columns < 2)
-		invalid('A column chart needs a header row, a label column, and numeric data.');
+		action = input.action ?? 'create';
+	if (!['create', 'update', 'remove'].includes(String(action))) invalid('Unknown chart action.');
 	if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100)
-		invalid('Give the chart a name of 1–100 characters.');
+		invalid('Supply a chart name up to 100 characters.');
 	if (input.title !== undefined && (typeof input.title !== 'string' || input.title.length > 200))
 		invalid('Chart title is limited to 200 characters.');
+	if (
+		input.kind !== undefined &&
+		!['column', 'bar', 'line', 'pie', 'area'].includes(String(input.kind))
+	)
+		invalid('Unknown chart kind.');
+	let range;
+	if (action === 'create' || input.range !== undefined) {
+		const r = sheetRange(input.range);
+		if (r.rows < 2 || r.columns < 2)
+			invalid('Chart data needs headers and at least two rows and columns.');
+		range = r.range;
+	}
+	if (
+		action === 'update' &&
+		range === undefined &&
+		input.kind === undefined &&
+		input.title === undefined
+	)
+		invalid('Supply range, kind or title to update.');
 	return {
 		...target,
-		range,
+		action: action as SheetChart['action'],
 		name: input.name,
-		...(input.title !== undefined ? { title: input.title as string } : {}),
+		...(range ? { range } : {}),
+		...(input.kind === undefined ? {} : { kind: input.kind as SheetChart['kind'] }),
+		...(input.title === undefined ? {} : { title: String(input.title) }),
 	};
 }

@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { AppError } from '🍎/lib/errors';
+	import { connectAppNavigation } from '🍎/lib/desktop/navigation';
+
 	import { onMount, tick } from 'svelte';
 	import RichEditor from './RichEditor.svelte';
 	import NotesList from './NotesList.svelte';
@@ -348,6 +351,41 @@
 			unsubscribeCommands();
 		};
 	});
+	onMount(() =>
+		connectAppNavigation('textedit', {
+			read: () => ({
+				path: note.path,
+				mode: plain ? 'plain' : source ? 'markdown' : 'formatted',
+				sidebar,
+				selection: editorSnapshot().selection,
+			}),
+			navigate: async ({ mode, sidebar: nextSidebar, selection }) => {
+				if ((mode === 'plain' && !plain) || (mode && mode !== 'plain' && plain))
+					throw new AppError(
+						'INVALID_INPUT',
+						'Plain files use plain mode; Markdown files use formatted or markdown mode.',
+					);
+				if (selection && mode === 'formatted')
+					throw new AppError('INVALID_INPUT', 'Source offsets require markdown or plain mode.');
+				if (selection && (selection.end > note.content.length || selection.start > selection.end))
+					throw new AppError(
+						'INVALID_INPUT',
+						'Selection must be a valid range in the current source text.',
+					);
+				if (mode) notepadView.source = mode === 'markdown';
+				if (selection && !plain) notepadView.source = true;
+				if (nextSidebar !== undefined) notepadView.sidebar = nextSidebar;
+				await tick();
+				if (selection) {
+					if (!sourceEditor)
+						throw new AppError('EDITOR_NOT_READY', 'Show the note editor and retry.');
+					sourceEditor.focus();
+					sourceEditor.setSelectionRange(selection.start, selection.end);
+					notifyNoteEditor();
+				}
+			},
+		}),
+	);
 </script>
 
 <svelte:window onkeydown={handleKeydown} />

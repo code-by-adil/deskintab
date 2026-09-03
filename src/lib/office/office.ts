@@ -1,10 +1,11 @@
+import type { ExtendedDocumentOperation } from './document-edit-inputs';
 import { AppError } from '../errors';
 import { openApp, apps } from '../../state/apps.svelte';
 import { activityService, type ActivityActor } from '../activity/activity';
 import { workspaceService } from '../workspace/workspace';
 import { normalizeWorkspacePath, workspaceBasename } from '../workspace/path';
 import { maxImageBytes, prepareOfficeImage } from './image';
-import { documentBlocks, documentOperation, officeRevision } from './inputs';
+import { documentBlocks, documentOperation, documentReadInput, officeRevision } from './inputs';
 import type { OfficeBridge as Bridge } from './protocol';
 import {
 	rangeInput,
@@ -24,6 +25,7 @@ export type DocumentBlock =
 	| { type: 'paragraph'; text: string; style?: string }
 	| { type: 'table'; rows: string[][] };
 export type DocumentOperation =
+	| ExtendedDocumentOperation
 	| { type: 'replace'; find: string; replace: string; expectedOccurrences: number }
 	| { type: 'paragraph'; index: number; text?: string; style?: string }
 	| { type: 'table-cell'; table: string; cell: string; text: string }
@@ -575,11 +577,56 @@ class OfficeService {
 			await this.#open(path);
 		});
 	}
-	read(path: string, signal?: AbortSignal) {
+	read(path: string, signal?: AbortSignal, input: unknown = {}) {
+		const scope = documentReadInput(input);
 		return this.#run(async () => {
 			await this.#open(path);
 			this.#signal?.throwIfAborted();
-			return { path: this.#state.path, ...(await this.#bridge!.request('read')) };
+			return { path: this.#state.path, ...(await this.#bridge!.request('read', scope)) };
+		}, signal);
+	}
+
+	selectDocument(
+		path: string,
+		revision: unknown,
+		input: Record<string, unknown>,
+		signal?: AbortSignal,
+	) {
+		const expectedRevision = officeRevision(revision);
+		const position = (key: string, fallback: number) => {
+			const n = input[key] ?? fallback;
+			if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 100000000)
+				throw new AppError('INVALID_INPUT', `Invalid ${key}.`);
+			return n;
+		};
+		const index = position('index', 0),
+			start = position('start', 0),
+			end = position('end', start);
+		if (end < start) throw new AppError('INVALID_INPUT', 'end must be at or after start.');
+		return this.#run(async () => {
+			await this.#open(path);
+			this.#signal?.throwIfAborted();
+			return {
+				path: this.#state.path,
+				...(await this.#bridge!.request('select', { expectedRevision, index, start, end })),
+			};
+		}, signal);
+	}
+	selectWorkbook(path: string, revision: unknown, input: unknown, signal?: AbortSignal) {
+		const expectedRevision = officeRevision(revision),
+			scope = rangeInput(input);
+		if (!scope.range) throw new AppError('INVALID_INPUT', 'Supply a cell range to select.');
+		return this.#run(async () => {
+			await this.#open(path);
+			this.#signal?.throwIfAborted();
+			return {
+				path: this.#state.path,
+				...(await this.#bridge!.request('sheet-select', {
+					expectedRevision,
+					sheet: scope.sheet,
+					range: scope.range!,
+				})),
+			};
 		}, signal);
 	}
 	newWorkbook(path: string, sheets: unknown, actor: ActivityActor = 'agent', signal?: AbortSignal) {

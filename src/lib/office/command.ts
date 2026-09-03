@@ -3,7 +3,7 @@ import { officeService } from './office';
 import { normalizeWorkspacePath } from '../workspace/path';
 
 const help = `docs — office documents in the shared desktop
-  docs read PATH                 structured JSON including revision
+  docs read PATH [SCOPE.json]    paged structured JSON including revision
   docs text PATH                 extracted text for pipes and searches
   docs create PATH BLOCKS.json    create ODT/DOCX from paragraph/table blocks
   docs edit PATH REVISION OP.json apply a focused change from a JSON file
@@ -21,8 +21,27 @@ export const documentsCommand = defineCommand('docs', async (args, ctx) => {
 		ctx.signal?.throwIfAborted();
 		let result: unknown;
 		if (action === 'read' || action === 'text') {
-			const document = await officeService.read(path, ctx.signal);
-			if (action === 'text') return { stdout: document.text + '\n', stderr: '', exitCode: 0 };
+			const scope =
+				action === 'text'
+					? { scope: 'text' }
+					: output
+						? JSON.parse(await ctx.fs.readFile(normalizeWorkspacePath(output, ctx.cwd)))
+						: {};
+			const document = await officeService.read(path, ctx.signal, scope);
+			if (action === 'text') {
+				let text = document.text,
+					offset = document.page?.nextOffset;
+				while (offset != null) {
+					const page = await officeService.read(path, ctx.signal, {
+						scope: 'text',
+						offset,
+						expectedRevision: document.revision,
+					});
+					text += page.text;
+					offset = page.page?.nextOffset;
+				}
+				return { stdout: text + '\n', stderr: '', exitCode: 0 };
+			}
 			result = document;
 		} else if (action === 'create' && output) {
 			const blocks = JSON.parse(await ctx.fs.readFile(normalizeWorkspacePath(output, ctx.cwd)));

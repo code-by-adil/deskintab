@@ -436,3 +436,50 @@ test('source bridge rejects forged senders, stale tokens, and unselected paths',
 		{ path: sourcePath, exists: false },
 	]);
 });
+
+test('live explorer tools share search filters views and refreshed data with the UI', async ({
+	page,
+}) => {
+	await setup(page);
+	await create(page);
+	let result = await ok(page, 'studio_query', {
+		path,
+		query: 'flight',
+		filter: 'Offline',
+		view: 'table',
+	});
+	expect(result.ready).toBe(true);
+	expect(result.matchedCount).toBe(1);
+	expect(result.rows[0].title).toBe('Save for a flight');
+	await expect(preview(page).getByLabel('Search records')).toHaveValue('flight');
+	await expect(preview(page).getByLabel('View', { exact: true })).toHaveValue('table');
+	await preview(page).getByLabel('Search records').fill('');
+	await preview(page).getByLabel('Feature', { exact: true }).selectOption('Search');
+	await expect
+		.poll(async () => (await ok(page, 'studio_read', { path })).liveView.matchedCount)
+		.toBe(1);
+	result = await ok(page, 'studio_query', { limit: 1 });
+	expect(result.filter).toBe('Search');
+	expect(result.rows[0].title).toBe('Find a phrase');
+	result = await ok(page, 'studio_query', { filter: null, limit: 1 });
+	expect(result.matchedCount).toBe(3);
+	expect(result.nextOffset).toBe(1);
+	const saved = await ok(page, 'files_read', { path: dataPath });
+	await ok(page, 'files_write', {
+		path: dataPath,
+		expectedRevision: saved.revision,
+		content: JSON.stringify([
+			...rows,
+			{ title: 'Another record', feature: 'Search', quote: 'New data' },
+		]),
+	});
+	result = await ok(page, 'studio_query', { reload: true, view: 'cards' });
+	expect(result.rowCount).toBe(4);
+	expect(result.matchedCount).toBe(4);
+	expect(result.dataChanged).toBe(false);
+	const manifest = await ok(page, 'studio_read', { path });
+	expect(manifest.data.view).toBe('cards');
+	const invalid = await call(page, 'studio_query', { filter: 'Missing' });
+	expect(invalid.structuredContent.ok).toBe(false);
+	expect((await ok(page, 'studio_query')).filter).toBeNull();
+});

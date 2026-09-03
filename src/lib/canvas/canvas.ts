@@ -399,6 +399,26 @@ export const canvasService = {
 			`${scene.title.replace(/[\\/:]/g, '-')}.excalidraw`,
 		);
 	},
+	async focusSelection(ids: string[], fit: boolean, signal: AbortSignal) {
+		const { waitUntil } = await import('../desktop/navigation');
+		await waitUntil(
+			() => !!api,
+			signal,
+			'The Canvas editor is still loading. Retry canvas_select.',
+		);
+		if (
+			!scene ||
+			ids.some((id) => !scene!.elements.some((element) => element.id === id && !element.isDeleted))
+		)
+			throw new AppError('OBJECT_NOT_FOUND', 'Read the Canvas and choose existing object IDs.');
+		requireIdle();
+		this.select(ids);
+		if (fit)
+			api!.scrollToContent(
+				ids.length ? scene.elements.filter((element) => ids.includes(element.id)) : scene.elements,
+				{ fitToContent: true, maxZoom: 1 },
+			);
+	},
 	fit() {
 		if (scene) api?.scrollToContent(scene.elements, { fitToContent: true, maxZoom: 1 });
 	},

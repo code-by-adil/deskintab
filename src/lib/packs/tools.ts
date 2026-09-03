@@ -19,7 +19,7 @@ export const packTools: WebMCP.ModelContextTool[] = [
 		name: 'packs_export',
 		title: 'Export workspace pack',
 		description:
-			'Save files/binary/empty folders at exact paths in a new .desktop-pack.json, default /Exports. Max5000 entries/32MiB decoded. Excludes System/Trash/packs/drafts/recovery/jobs; rejects symlinks. Download from Finder. No upload/sync.',
+			'Save files/binary/empty folders at exact paths in a new .desktop-pack.json, default /Exports. Max5000 entries/32MiB decoded. Excludes System/Trash/packs/drafts/recovery/jobs; rejects symlinks. Download with files_download or Finder. No upload/sync.',
 		annotations: { readOnlyHint: false, untrustedContentHint: true },
 		inputSchema: { type: 'object', properties: { path }, additionalProperties: false },
 		async execute(input, { signal }) {
@@ -30,7 +30,7 @@ export const packTools: WebMCP.ModelContextTool[] = [
 			});
 			return successfulResult(
 				result,
-				`Saved ${result.files} files and ${result.directories} folders in ${result.path}. Download it from Finder to keep a copy outside this browser.`,
+				`Saved ${result.files} files and ${result.directories} folders in ${result.path}. Use files_download with this path, or Finder’s Download action, to keep a copy outside this browser.`,
 			);
 		},
 	}),

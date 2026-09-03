@@ -1,3 +1,4 @@
+import { queryStudioView } from './view';
 import { openApp } from '../../state/apps.svelte';
 import { studioService, type StudioInput } from './studio';
 import { objectValue } from '../workspace/json-document';
@@ -66,6 +67,34 @@ async function show(path: string) {
 }
 export const studioTools: WebMCP.ModelContextTool[] = [
 	defineTool({
+		name: 'studio_query',
+		title: 'Search and filter the visible app',
+		description:
+			'Open an explorer and read/change its live search, exact filter, or cards/table view. Returns the same matching rows the person sees, paged with offset/nextOffset. reload refreshes its data file. Does not change saved app settings.',
+		annotations: { readOnlyHint: false, untrustedContentHint: true },
+		inputSchema: {
+			type: 'object',
+			properties: {
+				path: pathSchema,
+				query: { type: 'string', maxLength: 1000 },
+				filter: { type: ['string', 'null'], maxLength: 12000 },
+				view: { enum: ['cards', 'table'] },
+				reload: { type: 'boolean' },
+				offset: { type: 'integer', minimum: 0, maximum: 1000 },
+				limit: { type: 'integer', minimum: 1, maximum: 100 },
+			},
+			additionalProperties: false,
+		},
+		async execute(input, { signal }) {
+			openApp('studio');
+			const path = optionalAbsolutePath(input, 'path');
+			if (path) await studioService.open(path);
+			const result = await queryStudioView(input, signal);
+			return successfulResult(result, `Showing ${result.matchedCount} matching records.`);
+		},
+	}),
+
+	defineTool({
 		name: 'studio_list',
 		title: 'List apps',
 		description:
@@ -85,7 +114,9 @@ export const studioTools: WebMCP.ModelContextTool[] = [
 		annotations: { readOnlyHint: true, untrustedContentHint: true },
 		inputSchema: { type: 'object', properties: { path: pathSchema }, additionalProperties: false },
 		async execute(input) {
-			const result = await studioService.read(optionalAbsolutePath(input, 'path'));
+			const record = await studioService.read(optionalAbsolutePath(input, 'path'));
+			const context = studioService.context();
+			const result = { ...record, liveView: context?.path === record.path ? context : null };
 			return successfulResult(result, `Read ${result.data.title}.`);
 		},
 	}),
@@ -159,11 +190,12 @@ export const studioTools: WebMCP.ModelContextTool[] = [
 			required: ['path'],
 			additionalProperties: false,
 		},
-		async execute(input) {
+		async execute(input, { signal }) {
 			const path = absolutePath(input, 'path');
 			openApp('studio');
 			await studioService.open(path);
-			const result = await studioService.read(path);
+			const record = await studioService.read(path);
+			const result = { ...record, liveView: await queryStudioView({ reload: true }, signal) };
 			return successfulResult(result, `Opened ${result.data.title}.`);
 		},
 	}),

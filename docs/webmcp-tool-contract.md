@@ -1,6 +1,6 @@
 # WebMCP tool contract
 
-Deskstead registers 70 tools with `document.modelContext.registerTool()` in the top-level page. The tools call the same TypeScript services as the visible apps. Mutations return the saved result after updating the desktop. If an app cannot display a completed save, the result includes a display warning so the agent can distinguish the save from the display failure.
+Deskstead registers 89 tools with `document.modelContext.registerTool()` in the top-level page. The tools call the same TypeScript services as the visible apps. Mutations return the saved result after updating the desktop. If an app cannot display a completed save, the result includes a display warning so the agent can distinguish the save from the display failure.
 
 One tab owns the saved workspace at a time. A browser Web Lock is acquired before mounting IndexedDB. A second tab shows a close-and-reload message and registers no tools. Agents should connect to the open desktop or reopen the workspace after its previous tab closes.
 
@@ -10,6 +10,25 @@ The implementation uses the [WebMCP specification](https://webmachinelearning.gi
 
 | Tool                    | Effect                                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| `desktop_describe_tool` | Returns full usage and parameter guidance for a named tool without changing the workspace.             |
+| `desktop_window`        | Closes, minimizes, maximizes, restores or moves an open window using existing draft guards.            |
+| `home_navigate`         | Chooses Preferences, Toolbox or packs and selects a skill.                                             |
+| `projects_navigate`     | Chooses a project view and current or historical run.                                                  |
+| `tasks_navigate`        | Selects a task and its visible status filter.                                                          |
+| `inbox_navigate`        | Opens a request and chooses its visible status filter.                                                 |
+| `finder_navigate`       | Searches a folder and selects a visible file result.                                                   |
+| `notepad_navigate`      | Chooses source/formatted mode, sidebar visibility and source text selection.                           |
+| `preview_navigate`      | Sets zoom and PDF text view.                                                                           |
+| `activity_navigate`     | Opens Activity or Review, a saved version or a work summary.                                           |
+| `canvas_select`         | Selects object IDs and optionally fits them in the viewport.                                           |
+| `calculator_read`       | Reads the same calculation state shown in Calculator.                                                  |
+| `calculator_calculate`  | Calculates with explicit operands or the displayed value.                                              |
+| `wallpapers_read`       | Lists wallpapers and reads appearance preferences.                                                     |
+| `wallpapers_set`        | Changes wallpaper, light/dark preference, theme matching or reduced motion.                            |
+| `files_download`        | Requests a browser download of a saved file with its original bytes.                                   |
+| `studio_query`          | Reads or changes the explorer's live search, filter and view; returns matching rows.                   |
+| `documents_select`      | Selects a paragraph's text range in Writer at a checked revision.                                      |
+| `sheets_select`         | Shows a sheet and selects a cell range at a checked revision.                                          |
 | `home_get_context`      | Reads saved working preferences, a bounded skill catalog, and a brief for a fresh agent.               |
 | `home_save_preferences` | Creates or revision-checks the saved Home preferences.                                                 |
 | `home_list_skills`      | Lists saved skill names, descriptions, paths, and malformed-file warnings.                             |
@@ -46,7 +65,7 @@ The implementation uses the [WebMCP specification](https://webmachinelearning.gi
 | `sheets_create`         | Creates an ODS/XLSX workbook with named sheets, numbers, text, and formulas.                           |
 | `sheets_read`           | Reads a bounded cell range, calculated values, formulas, errors, selection, charts, and revision.      |
 | `sheets_edit`           | Edits or formats a range at a fresh revision, recalculates, and saves.                                 |
-| `sheets_chart`          | Creates a native column chart linked to workbook cells.                                                |
+| `sheets_chart`          | Creates, updates or removes column, bar, line, pie and area charts linked to cells.                    |
 | `sheets_export`         | Exports a new ODS/XLSX/PDF or a named chart as PNG for Documents.                                      |
 | `notes_get_context`     | Reads the current Notepad draft, revision, save status, and selected passage.                          |
 | `preview_read`          | Reads page text, selection and citation; optionally attaches source image or PDF-page pixels.          |
@@ -190,3 +209,44 @@ The Playwright suite executes registered callbacks against the live app and chec
 Project tests cover an agent checkpoint, a human answer, and a fresh page session continuing from the saved brief. They also exercise conflicting revisions, human draft protection, missing evidence, malformed-file discovery, visible project selection, and semantic Review recovery. The workflow tests invoke tools explicitly; they do not prove that a model selects them without guidance.
 
 [`tests/webmcp-evals.json`](../tests/webmcp-evals.json) contains model-routing cases in the [GoogleChromeLabs evaluation format](https://github.com/GoogleChromeLabs/webmcp-tools/tree/main/webmcp-evals). Prompts supply concrete paths and requested content; continuation cases include prior tool responses with fixture revisions or job IDs. These fixtures test how an agent uses returned information. They are not a browser smoke script and do not create those jobs or files. Runtime correctness and agent tool selection need separate runs, as described in [Chrome's evaluation guide](https://developer.chrome.com/docs/ai/webmcp/evals). Passing callback tests does not establish that a model chooses the right tools.
+
+## App navigation and utilities
+
+`desktop_reveal` supports all 16 apps, including `calculator` and `wallpapers`. It waits for the lazy app mount and applicable view readiness, returning `appReady` and view context. Office and Canvas still report editor status explicitly. Revealing a Finder file clears a previous search when needed to display it.
+
+Navigation tools return the actual visible view. Their optional `path` opens the relevant file first. They honor the same unsaved-form guards as the human UI:
+
+- `home_navigate`: `pane` is `preferences`, `toolbox` or `packs`; `skillPath` selects a skill.
+- `projects_navigate`: `view` is `overview`, `handoff`, `work` or `context`; `runId` selects a saved run.
+- `tasks_navigate`: `taskId` selects a task; `filter` is `all`, `todo`, `in-progress` or `done`. Selecting a hidden task clears the old filter unless a compatible filter is explicitly supplied.
+- `inbox_navigate`: `filter` is `all`, `new`, `filed` or `done`.
+- `finder_navigate`: `query` searches the current folder and `selectedPath` selects a visible result. Empty strings clear each.
+- `notepad_navigate`: `mode`, `sidebar`, and optional `selection: {start,end}`. Offsets are zero-based UTF-16 source positions. Selecting Markdown source changes to source mode.
+- `preview_navigate`: `zoom` is 0.5–2; `textView` chooses PDF text. `preview_reveal` selects pages.
+- `activity_navigate`: `tab` is `activity` or `review`; `versionId` and `sessionId` are mutually exclusive. `tab: "review"` without an ID returns to history. Activity filters are `all`, `human`, `agent`, `terminal`, `system`, and `terminal-events`.
+
+`desktop_window` accepts `target` and `action: close|minimize|maximize|restore|move`. Move requires desktop-pixel `x` and `y`, clamped to visible bounds. Closing uses the normal save/draft guards.
+
+`calculator_calculate` supports `set`, `clear`, `sign`, `percent`, `equals`, `add`, `subtract`, `multiply`, and `divide`. Binary operations require `operand`; `value` optionally replaces the current displayed value. `wallpapers_set` accepts wallpaper `id`, `matchTheme`, `theme: light|dark`, or `reducedMotion`. An explicit theme disables theme matching. Both utilities share state with their UI.
+
+`files_download` requests saved bytes, excluding unsaved drafts. The result reports `downloadRequested`, filename and byte count; browser settings determine the host destination. Finder's Download menu uses the same operation. A pack exported by `packs_export` can be downloaded with this tool.
+
+## Explorer view state
+
+`studio_read` includes `liveView` for the mounted app. `studio_query` opens an optional app `path`, changes `query`, exact `filter` (null clears), or `view: cards|table`, and waits for the sandboxed renderer to acknowledge the change. It returns the matching rows, available filters, rendered data revision, counts and `nextOffset`. Use `offset` and `limit` (1–100) to page. `reload: true` loads the current data file and resets the view to the saved default. View changes do not rewrite the manifest. Human searches and view changes are reflected in `studio_read` and desktop context. The frame remains sandboxed; its message bridge checks sender, origin and preview token.
+
+## Office continuation and structural editing
+
+`documents_read` defaults to its existing bounded overview and now returns total character, paragraph, table and image counts. `scope` may be `text`, `paragraphs`, `tables`, `table` or `images`. Use `offset` and `page.nextOffset` to continue; `limit` is 1–500 and `maxChars` is 1–100,000. `text` offsets count UTF-16 characters; the other scopes count items. A `table` scope requires its name and pages its cells. For a long paragraph or cell, use `limit: 1`, the item's offset, and its `nextTextOffset` as `textOffset`. Pin `expectedRevision` across pages; a changed document rejects continuation. `scope: paragraphs`, `limit: 1`, `includeFormatting: true` returns inline runs, with `nextRunTextOffset` for further runs. `docs text` follows text pages before returning, while `docs read PATH SCOPE.json` accepts the same scope options.
+
+`documents_edit` additionally supports `text-range` replacement/formatting/HTTP(S) links, `insert-paragraph`, `move-paragraph`, `table-structure` row/column insertion/removal, `image` resize/removal and `page-layout`. Paragraph indices and character ranges come from a current read. Moves use rich text transfer inside one native undo group. Image dimensions are millimetres and may round to Writer's layout units. `documents_select` takes a paragraph `index`, optional `start`/`end` offsets, and the read revision; it changes visible selection without editing content.
+
+`sheets_edit` additionally supports sheet add/rename/remove/move, row/column insertion/removal, `sort`, exact-value `filter`, `merge`, and richer formatting. Sort/filter `column` is zero-based within the target range; `header` defaults true. Filter `value: null` clears the range filter. Merge rejects nonempty cells except the top-left cell. Formatting adds italic, underline, font name/size, wrapping, alignment, row height and column width. `sheets_read` reports row visibility; `includeFormatting` adds cell formatting. `sheets_select` changes the visible sheet/range at its read revision.
+
+`sheets_chart` defaults to `action: create`; `update` changes the existing named chart's range, title or kind, and `remove` deletes it. Supported kinds are `column`, `bar`, `line`, `pie` and `area`. Creation needs a range; update/removal need an existing name. All edits save through the existing shared workspace and Review recovery.
+
+Canvas `reorder` operations list every non-bound-label object ID back-to-front; attached labels follow their shapes. Styles include fill/stroke styles, font family, text alignment and arrowheads. `canvas_select` takes `ids` and optional `fit`; empty IDs clear selection, and `fit: true` with empty IDs fits the drawing. Active gestures and text edits retain their existing guards.
+
+## Discovery payload
+
+Discovery includes all 89 tool names, concise intent descriptions and complete schema constraints/defaults. `desktop_describe_tool {name}` returns the original title, full description and parameter prose on demand. This keeps the registry within the local 57.5 KB regression budget; larger versions caused the tested native browser to disable discovery. That observed browser behavior is not a WebMCP specification limit. The registered callbacks still use the original service validation.

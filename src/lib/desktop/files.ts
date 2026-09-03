@@ -1,3 +1,4 @@
+import { waitForApp, appNavigationContext } from './navigation';
 import { tick } from 'svelte';
 import { openApp } from '../../state/apps.svelte';
 import { AppError } from '../errors';
@@ -10,7 +11,7 @@ import { notepadView } from '../workspace/notepad-view.svelte';
 import { isDocumentPath, isSheetPath, officeService, sheetsService } from '../office/office';
 import { isPreviewPath, previewService } from '../preview/preview';
 import { isTasksPath, tasksDocument } from '../tasks/tasks';
-import { isCanvasPath, canvasDocument } from '../canvas/canvas';
+import { isCanvasPath, canvasDocument, canvasService } from '../canvas/canvas';
 import { isProjectPath, projectsDocument } from '../projects/projects';
 import { HOME_PROFILE_PATH, homeService } from '../home/home';
 import { isInboxPath, inboxDocument } from '../inbox/inbox';
@@ -32,10 +33,15 @@ export const revealTargets = [
 	'canvas',
 	'terminal',
 	'activity',
+	'calculator',
+	'wallpapers',
 ] as const;
 
 export type RevealTarget = (typeof revealTargets)[number];
-type FileApp = Exclude<RevealTarget, 'finder' | 'terminal' | 'activity'>;
+type FileApp = Exclude<
+	RevealTarget,
+	'finder' | 'terminal' | 'activity' | 'calculator' | 'wallpapers'
+>;
 
 export function appForFile(entry: Pick<WorkspaceEntry, 'path' | 'kind'>): FileApp | 'finder' {
 	if (entry.kind === 'directory') return 'finder';
@@ -92,8 +98,8 @@ export async function revealDesktop(options: {
 	const entry = options.path ? await workspaceService.stat(options.path) : undefined;
 	const target = options.target ?? appForFile(entry!);
 	const path = entry?.path;
-	if (path && (target === 'terminal' || target === 'activity'))
-		throw new AppError('INVALID_INPUT', 'Open Terminal or Activity without a path.');
+	if (path && ['terminal', 'activity', 'calculator', 'wallpapers'].includes(target))
+		throw new AppError('INVALID_INPUT', 'Open this app without a file path.');
 	if (entry?.kind === 'directory' && target !== 'finder')
 		throw new AppError('NOT_A_FILE', `${entry.path} is a folder. Open it in Finder.`);
 
@@ -104,11 +110,18 @@ export async function revealDesktop(options: {
 			entry.kind === 'directory' ? entry.path : workspaceDirname(entry.path),
 			entry.kind === 'file' ? entry.path : '',
 		);
-	} else if (target !== 'finder' && target !== 'terminal' && target !== 'activity') {
+	} else if (
+		target !== 'finder' &&
+		target !== 'terminal' &&
+		target !== 'activity' &&
+		target !== 'calculator' &&
+		target !== 'wallpapers'
+	) {
 		const filePath = path ?? (target === 'textedit' ? notepadService.path : undefined);
 		if (filePath) await fileOpeners[target](filePath, signal);
 	}
 	await tick();
+	await waitForApp(target, signal);
 	if (target === 'textedit') {
 		if (noteEditorSnapshot()?.visible === false) {
 			notepadView.sidebar = false;
@@ -123,5 +136,16 @@ export async function revealDesktop(options: {
 			saveStatus: notepadService.current.status,
 		};
 	}
-	return { target, ...(entry ? { entry } : {}) };
+	const view =
+		target === 'documents' || target === 'sheets'
+			? (target === 'documents' ? officeService : sheetsService).snapshot()
+			: target === 'canvas'
+				? canvasService.snapshot()
+				: appNavigationContext(target as Parameters<typeof appNavigationContext>[0]);
+	return {
+		target,
+		...(entry ? { entry } : {}),
+		appReady: true,
+		view,
+	};
 }

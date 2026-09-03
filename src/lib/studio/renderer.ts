@@ -1,3 +1,4 @@
+import { selectStudioRows } from './view';
 import type { StudioFile, StudioRow, StudioSource } from './studio';
 
 // Only this renderer executes. Workspace values are serialized as data and reach
@@ -18,6 +19,7 @@ const search = byId('search');
 const filter = byId('filter');
 const view = byId('view');
 view.value = app.view;
+let requestId = null;
 if (app.filterField) {
   const label = app.columns.find((column) => column.key === app.filterField);
   byId('filter-label').textContent = label.label;
@@ -41,11 +43,10 @@ function sourceButton(row) {
   return button;
 }
 function render() {
-  const query = search.value.trim().toLocaleLowerCase();
-  const selected = rows.filter((row) =>
-    (filter.selectedIndex === 0 || !app.filterField || text(row[app.filterField]) === filter.value) &&
-    (!query || app.columns.some((column) => text(row[column.key]).toLocaleLowerCase().includes(query)))
-  );
+  const state={query:search.value,filter:filter.selectedIndex===0?null:filter.value,view:view.value};
+  const selected = selectStudioRows(rows,app,state);
+  parent.postMessage({type:'studio:view',token,state,requestId},parentOrigin);
+  requestId=null;
   byId('count').textContent = selected.length + ' of ' + rows.length + ' records';
   const results = byId('results');
   results.replaceChildren();
@@ -85,6 +86,15 @@ function render() {
     });
   }
 }
+window.addEventListener('message',event=>{
+ if(event.source!==parent||event.origin!==parentOrigin||event.data?.type!=='studio:set-view'||event.data.token!==token)return;
+ const state=event.data.state;
+ if(!state||typeof state.query!=='string'||state.query.length>1000||!['cards','table'].includes(state.view)||(state.filter!==null&&typeof state.filter!=='string'))return;
+ search.value=state.query;view.value=state.view;
+ filter.selectedIndex=state.filter===null?0:[...filter.options].findIndex((option,index)=>index>0&&option.value===state.filter);
+ requestId=event.data.requestId;
+ render();
+});
 search.addEventListener('input', render);
 filter.addEventListener('change', render);
 view.addEventListener('change', render);
@@ -114,7 +124,7 @@ export function renderExplorer(
 ) {
 	const nonce = crypto.randomUUID().replaceAll('-', '');
 	const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'none'; img-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'`;
-	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workspace app</title><style nonce="${nonce}">${style}</style></head><body><header><h1 id="title"></h1><p id="description"></p></header><div class="controls"><label class="search-control">Search records<input id="search" type="search" autocomplete="off" placeholder="Search selected fields"></label><label id="filter-control"><span id="filter-label">Filter</span><select id="filter"><option value="">All</option></select></label><label>View<select id="view" aria-label="View"><option value="cards">Cards</option><option value="table">Table</option></select></label></div><p id="count" role="status" aria-live="polite"></p><main id="results"></main><script nonce="${nonce}">const app=${json(app)};let rows=${json(rows)};const sources=${json(sources)},token=${json(token)},parentOrigin=${json(location.origin)};${script}</script></body></html>`;
+	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workspace app</title><style nonce="${nonce}">${style}</style></head><body><header><h1 id="title"></h1><p id="description"></p></header><div class="controls"><label class="search-control">Search records<input id="search" type="search" autocomplete="off" placeholder="Search selected fields"></label><label id="filter-control"><span id="filter-label">Filter</span><select id="filter"><option value="">All</option></select></label><label>View<select id="view" aria-label="View"><option value="cards">Cards</option><option value="table">Table</option></select></label></div><p id="count" role="status" aria-live="polite"></p><main id="results"></main><script nonce="${nonce}">const app=${json(app)};let rows=${json(rows)};const sources=${json(sources)},token=${json(token)},parentOrigin=${json(location.origin)};const selectStudioRows=${selectStudioRows.toString()};${script}</script></body></html>`;
 }
 
 export function studioSourceRequest(

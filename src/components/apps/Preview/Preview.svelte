@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { AppError } from '🍎/lib/errors';
+	import { connectAppNavigation } from '🍎/lib/desktop/navigation';
+
 	import WindowSheet from '🍎/components/SystemUI/WindowSheet.svelte';
 	import { onMount, untrack } from 'svelte';
 	import { apps } from '🍎/state/apps.svelte';
@@ -270,6 +273,18 @@
 			previewService.detachView();
 		};
 	});
+	onMount(() =>
+		connectAppNavigation('preview', {
+			ready: () => !busy,
+			read: () => ({ ...previewService.context(), zoom, textView }),
+			navigate: ({ zoom: nextZoom, textView: nextTextView }) => {
+				if (nextTextView && preview.kind !== 'pdf')
+					throw new AppError('INVALID_INPUT', 'Text view is available for PDFs only.');
+				if (nextZoom !== undefined) zoom = nextZoom;
+				if (nextTextView !== undefined) textView = nextTextView;
+			},
+		}),
+	);
 </script>
 
 <svelte:window onkeydown={keyboard} />

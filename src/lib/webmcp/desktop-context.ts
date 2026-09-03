@@ -1,3 +1,6 @@
+import { appNavigationContext, windowContext } from '../desktop/navigation';
+import { calculatorSnapshot } from '../desktop/calculator-state.svelte';
+import { wallpaperContext } from '../desktop/appearance';
 import { apps, type AppID } from '../../state/apps.svelte';
 import { apps_config } from '../../configs/apps/apps-config';
 import { finderState } from '../workspace/finder-state.svelte';
@@ -11,7 +14,7 @@ import { terminalService } from '../terminal/terminal';
 import { homeService, homeDocument, HOME_PROFILE_PATH } from '../home/home';
 import { inboxDocument } from '../inbox/inbox';
 import { shortcutDocument } from '../shortcuts/shortcuts';
-import { studioDocument } from '../studio/studio';
+import { studioDocument, studioService } from '../studio/studio';
 import {
 	isAppVisible,
 	tasksInteractionContext,
@@ -48,6 +51,7 @@ export async function desktopGetContext() {
 		.map((id) => ({
 			id,
 			title: apps_config[id].title,
+			window: windowContext(id),
 			minimized: apps.minimized[id],
 			focused: isAppVisible(id) && apps.active === id,
 		}));
@@ -78,16 +82,28 @@ export async function desktopGetContext() {
 		context: {
 			home: isAppVisible('home')
 				? {
+						...appNavigationContext('home'),
 						path: HOME_PROFILE_PATH,
 						pendingEdits: homeDocument.hasPendingEdits(HOME_PROFILE_PATH),
 						readTool: 'home_get_context',
 					}
 				: null,
-			inbox: documentContext('inbox', inboxDocument, 'inbox_read'),
+			inbox: isAppVisible('inbox')
+				? {
+						...documentContext('inbox', inboxDocument, 'inbox_read'),
+						...appNavigationContext('inbox'),
+					}
+				: null,
 			shortcuts: documentContext('shortcuts', shortcutDocument, 'shortcuts_read'),
-			studio: documentContext('studio', studioDocument, 'studio_read'),
+			studio: isAppVisible('studio')
+				? {
+						...documentContext('studio', studioDocument, 'studio_read'),
+						liveView: studioService.context(),
+					}
+				: null,
 			finder: isAppVisible('finder')
 				? {
+						...appNavigationContext('finder'),
 						path: finderState.path,
 						selectedPath:
 							finderState.selectedPath &&
@@ -98,6 +114,7 @@ export async function desktopGetContext() {
 				: null,
 			notepad: isAppVisible('textedit')
 				? {
+						...appNavigationContext('textedit'),
 						path: notepadService.path,
 						status: notepadService.current.status,
 						mode: note?.mode ?? null,
@@ -112,7 +129,7 @@ export async function desktopGetContext() {
 				: null,
 			documents: isAppVisible('documents') ? officeContext(officeService) : null,
 			sheets: isAppVisible('sheets') ? officeContext(sheetsService) : null,
-			preview: isAppVisible('preview') ? preview : null,
+			preview: isAppVisible('preview') ? { ...preview, ...appNavigationContext('preview') } : null,
 			canvas: isAppVisible('canvas')
 				? {
 						...canvas,
@@ -123,6 +140,8 @@ export async function desktopGetContext() {
 			tasks: tasksInteractionContext(),
 			projects: projectsInteractionContext(),
 			review: reviewInteractionContext(),
+			calculator: isAppVisible('calculator') ? calculatorSnapshot() : null,
+			wallpapers: isAppVisible('wallpapers') ? wallpaperContext() : null,
 			terminal: isAppVisible('terminal') ? { cwd: terminalService.cwd } : null,
 		},
 	};

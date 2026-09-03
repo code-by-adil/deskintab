@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { connectAppNavigation } from '🍎/lib/desktop/navigation';
+
 	import { onMount } from 'svelte';
 	import WindowSheet from '🍎/components/SystemUI/WindowSheet.svelte';
 	import InboxIcon from '~icons/mdi/inbox-arrow-down-outline';
@@ -247,6 +249,24 @@
 			clearClose();
 		};
 	});
+	onMount(() =>
+		connectAppNavigation('inbox', {
+			ready: () => !record.loading,
+			read: () => ({
+				path: record.path,
+				filter,
+				visiblePaths: visible.map((item) => item.path),
+				busy,
+				dirty,
+			}),
+			navigate: async ({ filter: nextFilter }) => {
+				if (busy || dirty)
+					throw new AppError('UNSAVED_EDITS', 'Save or discard Inbox edits before navigating.');
+				if (nextFilter !== undefined) filter = nextFilter;
+				await refreshList();
+			},
+		}),
+	);
 </script>
 
 <svelte:window

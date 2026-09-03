@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AppReady from './AppReady.svelte';
 	import { apps_config, type AppID } from '🍎/configs/apps/apps-config';
 
 	const { app_id }: { app_id: AppID } = $props();
@@ -6,4 +7,5 @@
 
 {#await apps_config[app_id].load() then { default: App }}
 	<App />
+	<AppReady {app_id} />
 {/await}

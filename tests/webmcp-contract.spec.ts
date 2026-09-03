@@ -58,7 +58,7 @@ test.beforeEach(async ({ page }) => {
 		});
 	});
 	await page.goto('/');
-	await page.waitForFunction(() => Object.keys(window.__contractTools).length === 70);
+	await page.waitForFunction(() => Object.keys(window.__contractTools).length === 89);
 });
 
 async function call(page: Page, name: string, input: unknown = {}) {
@@ -139,7 +139,7 @@ test('unregisters old tools and rolls back a partial registration', async ({ pag
 	});
 	expect(result).toEqual({
 		oldAborted: true,
-		registered: 70,
+		registered: 89,
 		afterCleanup: 0,
 		rejected: true,
 		afterFailure: 0,

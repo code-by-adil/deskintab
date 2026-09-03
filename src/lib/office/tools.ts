@@ -1,3 +1,4 @@
+import { documentEditSchemas } from './document-edit-inputs';
 import { officeService } from './office';
 import { absolutePath, defineTool, successfulResult } from '../webmcp/tool-utils';
 
@@ -36,6 +37,35 @@ const blocks = { type: 'array', maxItems: 200, items: { oneOf: [paragraph, table
 
 export const documentTools: WebMCP.ModelContextTool[] = [
 	defineTool({
+		name: 'documents_select',
+		title: 'Select document text',
+		description:
+			'Reveal a paragraph or select its text in Writer at the latest documents_read revision. start/end are zero-based UTF-16 offsets inside the paragraph; omitted offsets place the cursor at its start. Does not edit content.',
+		annotations: { readOnlyHint: false, untrustedContentHint: true },
+		inputSchema: {
+			type: 'object',
+			required: ['path', 'expectedRevision', 'index'],
+			properties: {
+				path,
+				expectedRevision: { type: 'integer', minimum: 0 },
+				index: { type: 'integer', minimum: 0 },
+				start: { type: 'integer', minimum: 0 },
+				end: { type: 'integer', minimum: 0 },
+			},
+			additionalProperties: false,
+		},
+		async execute(input, { signal }) {
+			const result = await officeService.selectDocument(
+				absolutePath(input, 'path'),
+				input.expectedRevision,
+				input,
+				signal,
+			);
+			return successfulResult(result, 'Selected text in Documents.');
+		},
+	}),
+
+	defineTool({
 		name: 'documents_create',
 		title: 'Create document',
 		description:
@@ -62,16 +92,33 @@ export const documentTools: WebMCP.ModelContextTool[] = [
 		name: 'documents_read',
 		title: 'Read document',
 		description:
-			'Read ODT/DOCX in Documents, not files_read. Saves drafts before switching. Returns bounded text, indexed/styled paragraphs, cells, image metadata, selection, revision/truncation.',
+			'Read ODT/DOCX in Documents, not files_read. Saves drafts before switching. Overview returns bounded content and totals. Page with scope and offset; follow page.nextOffset. For truncated paragraphs/cells use limit:1 and textOffset/nextTextOffset. Pin expectedRevision across pages.',
 		annotations: { readOnlyHint: false, untrustedContentHint: true },
 		inputSchema: {
 			type: 'object',
 			required: ['path'],
-			properties: { path },
+			properties: {
+				includeFormatting: {
+					type: 'boolean',
+					description:
+						'For scope paragraphs with limit 1, include bounded inline runs; follow nextRunTextOffset using textOffset.',
+				},
+				path,
+				scope: {
+					type: 'string',
+					enum: ['overview', 'text', 'paragraphs', 'tables', 'table', 'images'],
+				},
+				offset: { type: 'integer', minimum: 0 },
+				limit: { type: 'integer', minimum: 1, maximum: 500 },
+				textOffset: { type: 'integer', minimum: 0 },
+				maxChars: { type: 'integer', minimum: 1, maximum: 100000 },
+				table: { type: 'string' },
+				expectedRevision: { type: 'integer', minimum: 0 },
+			},
 			additionalProperties: false,
 		},
 		async execute(input, options) {
-			const document = await officeService.read(absolutePath(input, 'path'), options.signal);
+			const document = await officeService.read(absolutePath(input, 'path'), options.signal, input);
 			return successfulResult(
 				{ document },
 				`Read ${document.path}, revision ${document.revision}.`,
@@ -92,6 +139,7 @@ export const documentTools: WebMCP.ModelContextTool[] = [
 				expectedRevision: { type: 'integer', minimum: 0 },
 				operation: {
 					oneOf: [
+						...documentEditSchemas,
 						{
 							type: 'object',
 							required: ['type', 'imagePath'],

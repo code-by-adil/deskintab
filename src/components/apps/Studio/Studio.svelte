@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
+	import {
+		connectStudioView,
+		selectStudioRows,
+		studioViewInput,
+		type StudioView,
+	} from '🍎/lib/studio/view';
+	import { waitUntil } from '🍎/lib/desktop/navigation';
 	import WindowSheet from '🍎/components/SystemUI/WindowSheet.svelte';
 	import { AppError } from '🍎/lib/errors';
 	import { revealDesktop } from '🍎/lib/desktop/files';
@@ -37,6 +44,76 @@
 	let showFiles = $state(false);
 	let alive = true;
 	let previewGeneration = 0;
+	let liveView = $state.raw<StudioView>({ query: '', filter: null, view: 'cards' });
+	let renderedToken = $state('');
+	let acknowledgedRequest = '';
+	function viewContext() {
+		const ready = preview !== null && renderedToken === preview.token;
+		return {
+			path: record.path,
+			ready,
+			...liveView,
+			dataRevision: preview?.dataRevision ?? null,
+			manifestRevision: preview?.manifestRevision ?? null,
+			rowCount: preview?.rowCount ?? 0,
+			matchedCount: ready ? selectStudioRows(preview!.rows, preview!.app, liveView).length : null,
+			dataChanged,
+			settingsOpen: draft !== null,
+		};
+	}
+	async function queryView(
+		input: import('🍎/lib/studio/view').StudioViewInput,
+		signal: AbortSignal,
+	) {
+		if (!record.path) throw new AppError('NO_APP', 'Open a saved app first.');
+		if (input.reload) await reloadPreview();
+		await waitUntil(
+			() => Boolean(preview && renderedToken === preview.token),
+			signal,
+			'The explorer has not rendered. Check its data and retry.',
+		);
+		const current = preview!;
+		const state = {
+			...liveView,
+			...(input.query === undefined ? {} : { query: input.query }),
+			...(input.filter === undefined ? {} : { filter: input.filter }),
+			...(input.view === undefined ? {} : { view: input.view }),
+		};
+		const filters = current.app.filterField
+			? [...new Set(current.rows.map((row) => String(row[current.app.filterField!] ?? '')))].sort()
+			: [];
+		if (state.filter !== null && (!current.app.filterField || !filters.includes(state.filter)))
+			throw new AppError(
+				'INVALID_FILTER',
+				'Choose an available filter value, or null for all records.',
+			);
+		if (input.query !== undefined || input.filter !== undefined || input.view !== undefined) {
+			const requestId = crypto.randomUUID();
+			iframe!.contentWindow!.postMessage(
+				{ type: 'studio:set-view', token: current.token, state, requestId },
+				'*',
+			);
+			await waitUntil(
+				() => acknowledgedRequest === requestId,
+				signal,
+				'The explorer did not acknowledge the view change. Retry.',
+			);
+		}
+		await tick();
+		if (preview !== current)
+			throw new AppError('APP_CHANGED', 'The explorer changed. Query it again.');
+		const selected = selectStudioRows(current.rows, current.app, liveView),
+			offset = input.offset ?? 0,
+			limit = input.limit ?? 25;
+		return {
+			...viewContext(),
+			filters,
+			rows: selected.slice(offset, offset + limit),
+			offset,
+			nextOffset: offset + limit < selected.length ? offset + limit : null,
+		};
+	}
+
 	let listGeneration = 0;
 	let detailsGeneration = 0;
 	const dirty = $derived(draft !== null && JSON.stringify(draft) !== draftBase);
@@ -224,6 +301,17 @@
 	}
 	function onMessage(event: MessageEvent) {
 		if (!preview || event.source !== iframe?.contentWindow || event.origin !== 'null') return;
+		if (event.data?.type === 'studio:view' && event.data.token === preview.token) {
+			try {
+				const state = studioViewInput(event.data.state);
+				if (state.query === undefined || state.filter === undefined || state.view === undefined)
+					return;
+				liveView = { query: state.query, filter: state.filter, view: state.view };
+				renderedToken = preview.token;
+				if (typeof event.data.requestId === 'string') acknowledgedRequest = event.data.requestId;
+			} catch {}
+			return;
+		}
 		const path = studioSourceRequest(event.data, preview.token, preview.sources);
 		if (path)
 			void revealDesktop({ path }).catch((cause) => {
@@ -244,6 +332,7 @@
 	}
 	onMount(() => {
 		alive = true;
+		const disconnectView = connectStudioView({ read: viewContext, query: queryView });
 		const unsubscribe = studioDocument.subscribe(refreshRecord);
 		const unsubscribeFiles = workspaceService.subscribe(() => {
 			void refreshList();
@@ -276,6 +365,7 @@
 			});
 		return () => {
 			alive = false;
+			disconnectView();
 			previewGeneration++;
 			detailsGeneration++;
 			listGeneration++;

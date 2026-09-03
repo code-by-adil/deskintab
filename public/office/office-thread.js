@@ -204,7 +204,42 @@ Module.zetajs.then((zeta) => {
 				text.insertControlCharacter(cursor, css.text.ControlCharacter.PARAGRAPH_BREAK, false);
 		});
 	}
-	function read() {
+
+	function paragraphRuns(paragraph, offset) {
+		const runs = [];
+		let position = 0,
+			nextRunTextOffset = null;
+		for (const portion of paragraph.createEnumeration()) {
+			const length = portion.getString().length,
+				start = position;
+			position += length;
+			if (position <= offset) continue;
+			if (runs.length === 200) {
+				nextRunTextOffset = start;
+				break;
+			}
+			const get = (name) => portion.getPropertyValue(name);
+			runs.push({
+				start,
+				end: position,
+				type: get('TextPortionType'),
+				bold: get('CharWeight') >= css.awt.FontWeight.BOLD,
+				italic: get('CharPosture') === css.awt.FontSlant.ITALIC,
+				underline: get('CharUnderline') !== css.awt.FontUnderline.NONE,
+				fontSize: get('CharHeight'),
+				fontName: get('CharFontName'),
+				color: get('CharColor'),
+				link: get('HyperLinkURL'),
+			});
+		}
+		return { runs, nextRunTextOffset };
+	}
+	function read(input) {
+		if (input.expectedRevision !== undefined && input.expectedRevision !== revision)
+			throw error(
+				'DOCUMENT_CHANGED',
+				'The document changed. Restart the read with its current revision.',
+			);
 		const text = model.getText().getString();
 		let selection = null;
 		try {
@@ -223,6 +258,110 @@ Module.zetajs.then((zeta) => {
 		const names = tables.getElementNames();
 		const graphics = model.getGraphicObjects();
 		const imageNames = graphics.getElementNames();
+		const totals = {
+			characters: text.length,
+			paragraphs: all.length,
+			tables: names.length,
+			images: imageNames.length,
+		};
+		const scope = input.scope || 'overview';
+		if (scope !== 'overview') {
+			const offset = input.offset || 0,
+				limit = input.limit || 50,
+				textOffset = input.textOffset || 0;
+			let budget = input.maxChars || 100000;
+			const clip = (value) => {
+				const result = value.slice(textOffset, textOffset + budget);
+				budget -= result.length;
+				return {
+					text: result,
+					truncated: textOffset + result.length < value.length,
+					totalCharacters: value.length,
+					nextTextOffset:
+						textOffset + result.length < value.length ? textOffset + result.length : null,
+				};
+			};
+			const result = {
+				revision,
+				totals,
+				selection,
+				text: '',
+				truncated: false,
+				imageCount: imageNames.length,
+				images: [],
+				paragraphs: [],
+				tables: [],
+				styles: [],
+			};
+			let total, count;
+			if (scope === 'text') {
+				result.text = text.slice(offset, offset + budget);
+				total = text.length;
+				count = result.text.length;
+			} else if (scope === 'paragraphs') {
+				total = all.length;
+				for (let index = offset; index < Math.min(total, offset + limit) && budget > 0; index++) {
+					const paragraph = all[index];
+					result.paragraphs.push({
+						index,
+						style: paragraph.getPropertyValue('ParaStyleName'),
+						...clip(paragraph.getString()),
+						...(input.includeFormatting ? paragraphRuns(paragraph, textOffset) : {}),
+					});
+				}
+				count = result.paragraphs.length;
+			} else if (scope === 'tables') {
+				total = names.length;
+				result.tables = names.slice(offset, offset + limit).map((name) => ({
+					name,
+					cellCount: tables.getByName(name).getCellNames().length,
+					cells: [],
+					truncated: false,
+				}));
+				count = result.tables.length;
+			} else if (scope === 'table') {
+				if (!tables.hasByName(input.table))
+					throw error('TABLE_MISSING', 'Read scope tables for valid names.');
+				const table = tables.getByName(input.table),
+					cells = table.getCellNames();
+				total = cells.length;
+				const rows = [];
+				for (let i = offset; i < Math.min(total, offset + limit) && budget > 0; i++)
+					rows.push({ cell: cells[i], ...clip(table.getCellByName(cells[i]).getString()) });
+				count = rows.length;
+				result.tables = [
+					{ name: input.table, cells: rows, truncated: rows.some((row) => row.truncated) },
+				];
+			} else {
+				total = imageNames.length;
+				result.images = imageNames.slice(offset, offset + limit).map((name) => {
+					const image = graphics.getByName(name),
+						description = clip(image.getPropertyValue('Description'));
+					return {
+						name,
+						description: description.text,
+						truncated: description.truncated,
+						nextTextOffset: description.nextTextOffset,
+						widthMm: image.getPropertyValue('Width') / 100,
+						heightMm: image.getPropertyValue('Height') / 100,
+					};
+				});
+				count = result.images.length;
+			}
+			result.page = {
+				scope,
+				offset,
+				nextOffset: offset + count < total ? offset + count : null,
+				total,
+				textOffset,
+			};
+			result.truncated =
+				result.page.nextOffset !== null ||
+				result.paragraphs.some((p) => p.truncated) ||
+				result.tables.some((t) => t.truncated) ||
+				result.images.some((i) => i.truncated);
+			return result;
+		}
 		let remaining = 100_000;
 		let structuredTruncated = false;
 		function boundedText(value, limit) {
@@ -259,6 +398,7 @@ Module.zetajs.then((zeta) => {
 		});
 		return {
 			revision,
+			totals,
 			selection,
 			text: text.slice(0, 100_000),
 			truncated:
@@ -274,6 +414,164 @@ Module.zetajs.then((zeta) => {
 			styles: model.getStyleFamilies().getByName('ParagraphStyles').getElementNames(),
 			tables: tableResults,
 		};
+	}
+
+	function extendEdit(op) {
+		const types = [
+			'text-range',
+			'insert-paragraph',
+			'move-paragraph',
+			'table-structure',
+			'image',
+			'page-layout',
+		];
+		if (!types.includes(op.type)) return false;
+		const undo = model.getUndoManager();
+		// Validate model addresses before entering the undo group.
+		let paragraph, cursor, object, collection;
+		if (['text-range', 'insert-paragraph', 'move-paragraph'].includes(op.type)) {
+			const all = paragraphs();
+			paragraph = all[op.index];
+			if (!paragraph) throw error('PARAGRAPH_MISSING', 'Read paragraphs for a valid index.');
+			if (
+				op.type === 'move-paragraph' &&
+				(op.index + op.delta < 0 || op.index + op.delta >= all.length)
+			)
+				throw error('INVALID_INPUT', 'Paragraph destination is outside the document.');
+			if (op.type === 'text-range' && op.end > paragraph.getString().length)
+				throw error('INVALID_INPUT', 'Text range exceeds the paragraph length.');
+			if (op.style !== undefined) validateStyles(model, [{ type: 'paragraph', style: op.style }]);
+			cursor = paragraph.getText().createTextCursorByRange(paragraph.getStart());
+		}
+		if (op.type === 'table-structure') {
+			if (!model.getTextTables().hasByName(op.table))
+				throw error('TABLE_MISSING', 'Read tables for a valid name.');
+			object = model.getTextTables().getByName(op.table);
+			collection = op.axis === 'rows' ? object.getRows() : object.getColumns();
+			const count = collection.getCount();
+			if (
+				op.index > count ||
+				(op.action === 'remove' && (op.index + op.count > count || op.count >= count))
+			)
+				throw error('INVALID_INPUT', 'Choose existing rows/columns and leave at least one.');
+		}
+		if (op.type === 'image') {
+			if (!model.getGraphicObjects().hasByName(op.name))
+				throw error('IMAGE_MISSING', 'Read images for a valid name.');
+			object = model.getGraphicObjects().getByName(op.name);
+		}
+		if (op.type === 'page-layout') {
+			const pageName = model
+				.getCurrentController()
+				.getViewCursor()
+				.getPropertyValue('PageStyleName');
+			object = model.getStyleFamilies().getByName('PageStyles').getByName(pageName);
+		}
+		undo.enterUndoContext('Edit document ' + op.type);
+		let failed;
+		try {
+			if (op.type === 'text-range') {
+				const advance = (n, expand) => {
+					while (n > 0) {
+						const count = Math.min(n, 32767);
+						cursor.goRight(count, expand);
+						n -= count;
+					}
+				};
+				advance(op.start, false);
+				advance(op.end - op.start, true);
+				if (op.text !== undefined) cursor.setString(op.text);
+				if (op.bold !== undefined)
+					cursor.setPropertyValue(
+						'CharWeight',
+						new zeta.Any(
+							zeta.type.float,
+							op.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL,
+						),
+					);
+				if (op.italic !== undefined)
+					cursor.setPropertyValue(
+						'CharPosture',
+						op.italic ? css.awt.FontSlant.ITALIC : css.awt.FontSlant.NONE,
+					);
+				if (op.underline !== undefined)
+					cursor.setPropertyValue(
+						'CharUnderline',
+						new zeta.Any(
+							zeta.type.short,
+							op.underline ? css.awt.FontUnderline.SINGLE : css.awt.FontUnderline.NONE,
+						),
+					);
+				if (op.fontSize !== undefined)
+					cursor.setPropertyValue('CharHeight', new zeta.Any(zeta.type.float, op.fontSize));
+				if (op.fontName !== undefined) cursor.setPropertyValue('CharFontName', op.fontName);
+				if (op.color !== undefined)
+					cursor.setPropertyValue('CharColor', parseInt(op.color.slice(1), 16));
+				if (op.link !== undefined) cursor.setPropertyValue('HyperLinkURL', op.link);
+			} else if (op.type === 'insert-paragraph') {
+				cursor.getText().insertString(cursor, op.text, false);
+				cursor.collapseToEnd();
+				cursor
+					.getText()
+					.insertControlCharacter(cursor, css.text.ControlCharacter.PARAGRAPH_BREAK, false);
+				if (op.style !== undefined) setStyle(paragraphs()[op.index], op.style);
+			} else if (op.type === 'move-paragraph') {
+				if (op.delta !== 0) {
+					const all = paragraphs(),
+						destination = all[op.index + op.delta],
+						text = paragraph.getText();
+					const touchesEnd = op.index === all.length - 1 || op.index + op.delta === all.length - 1;
+					if (touchesEnd) {
+						const end = text.createTextCursor();
+						end.gotoEnd(false);
+						text.insertControlCharacter(end, css.text.ControlCharacter.PARAGRAPH_BREAK, false);
+					}
+					const target = text.createTextCursorByRange(
+						op.delta > 0 ? destination.getEnd() : destination.getStart(),
+					);
+					if (op.delta > 0) target.goRight(1, false);
+					cursor.gotoRange(paragraph.getEnd(), true);
+					cursor.goRight(1, true);
+					const controller = model.getCurrentController();
+					controller.select(cursor);
+					const content = controller.getTransferable();
+					cursor.setString('');
+					controller.select(target);
+					controller.insertTransferable(content);
+					if (touchesEnd) {
+						const end = text.createTextCursor();
+						end.gotoEnd(false);
+						end.goLeft(1, true);
+						end.setString('');
+					}
+				}
+			} else if (op.type === 'table-structure') {
+				if (op.action === 'insert') collection.insertByIndex(op.index, op.count);
+				else collection.removeByIndex(op.index, op.count);
+			} else if (op.type === 'image') {
+				if (op.action === 'remove') object.getAnchor().getText().removeTextContent(object);
+				else {
+					object.setPropertyValue('Width', Math.round(op.widthMm * 100));
+					object.setPropertyValue('Height', Math.round(op.heightMm * 100));
+				}
+			} else {
+				object.setPropertyValue('IsLandscape', op.widthMm > op.heightMm);
+				object.setPropertyValue('Width', Math.round(op.widthMm * 100));
+				object.setPropertyValue('Height', Math.round(op.heightMm * 100));
+				for (const side of ['Left', 'Right', 'Top', 'Bottom'])
+					object.setPropertyValue(side + 'Margin', Math.round(op.marginMm * 100));
+			}
+		} catch (e) {
+			failed = e;
+		} finally {
+			undo.leaveUndoContext();
+		}
+		if (failed) {
+			if (undo.isUndoPossible() && undo.getCurrentUndoActionTitle() === 'Edit document ' + op.type)
+				undo.undo();
+			throw failed;
+		}
+		return true;
 	}
 	function execute(input) {
 		if (input.cmd === 'open' || input.cmd === 'create') {
@@ -318,6 +616,7 @@ Module.zetajs.then((zeta) => {
 					'DOCUMENT_CHANGED',
 					'The workbook changed. Read it again and use its current revision.',
 				);
+			if (input.cmd === 'sheet-select') return { selection: sheets.select(model, input), revision };
 			if (input.cmd === 'sheet-edit') sheets.edit(model, input.operation);
 			else if (input.cmd === 'sheet-chart') {
 				const chart = sheets.chart(model, input.chart);
@@ -325,7 +624,36 @@ Module.zetajs.then((zeta) => {
 			} else throw error('INVALID_INPUT', 'Unknown workbook operation.');
 			return { revision };
 		}
-		if (input.cmd === 'read') return read();
+		if (input.cmd === 'read') return read(input);
+		if (input.cmd === 'select') {
+			if (input.expectedRevision !== revision)
+				throw error('DOCUMENT_CHANGED', 'Read the current document before selecting text.');
+			const paragraph = paragraphs()[input.index];
+			if (!paragraph || input.end > paragraph.getString().length)
+				throw error(
+					'INVALID_INPUT',
+					'Select an existing paragraph and text offsets from documents_read.',
+				);
+			const cursor = paragraph.getText().createTextCursorByRange(paragraph.getStart());
+			const advance = (n, expand) => {
+				while (n > 0) {
+					const count = Math.min(n, 32767);
+					cursor.goRight(count, expand);
+					n -= count;
+				}
+			};
+			advance(input.start, false);
+			advance(input.end - input.start, true);
+			model.getCurrentController().select(cursor);
+			return {
+				revision,
+				selection: {
+					text: cursor.getString().slice(0, 10000),
+					truncated: cursor.getString().length > 10000,
+					collapsed: cursor.isCollapsed(),
+				},
+			};
+		}
 		if (input.cmd === 'state') return { revision, modified: model.isModified() };
 		if (input.cmd === 'mark-saved') {
 			if (input.revision === revision) model.setModified(false);
@@ -350,6 +678,7 @@ Module.zetajs.then((zeta) => {
 					'The document changed. Read it again and use its current revision.',
 				);
 			const op = input.operation;
+			if (extendEdit(op)) return { revision };
 			if (op.type === 'replace') {
 				const descriptor = model.createReplaceDescriptor();
 				descriptor.setSearchString(op.find);

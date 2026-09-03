@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { connectAppNavigation } from '🍎/lib/desktop/navigation';
+
 	import { onMount } from 'svelte';
 	import WindowSheet from '🍎/components/SystemUI/WindowSheet.svelte';
 	import ProjectForm from './ProjectForm.svelte';
@@ -385,6 +387,37 @@
 			stopCommands();
 		};
 	});
+	onMount(() =>
+		connectAppNavigation('projects', {
+			ready: () => !loading && !record.loading,
+			read: () => ({
+				path: record.path,
+				view: overview ? 'overview' : tab,
+				runId: run?.id ?? null,
+				busy,
+			}),
+			navigate: ({ view, runId }) => {
+				if (view === 'overview' && runId !== undefined)
+					throw new AppError(
+						'INVALID_INPUT',
+						'A run belongs to a project view, not the project overview.',
+					);
+				if (!guardNavigation()) throw new AppError('UNSAVED_EDITS', error);
+				if (runId !== undefined && !project?.runs.some((item) => item.id === runId))
+					throw new AppError('RUN_NOT_FOUND', 'Read the project and choose an existing run ID.');
+				if (view !== 'overview' && (view || runId) && !project)
+					throw new AppError('NO_PROJECT', 'Open a project file first.');
+				if (view) {
+					overview = view === 'overview';
+					if (view !== 'overview') tab = view;
+				}
+				if (runId !== undefined) {
+					selectedRunId = runId;
+					overview = false;
+				}
+			},
+		}),
+	);
 </script>
 
 <svelte:window

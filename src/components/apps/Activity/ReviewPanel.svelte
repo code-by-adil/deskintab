@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { AppError } from '🍎/lib/errors';
+	import { connectAppNavigation, waitUntil } from '🍎/lib/desktop/navigation';
+
 	import { onMount } from 'svelte';
 	import { reviewService, type VersionReview } from '🍎/lib/activity/review';
 	import type { FileVersion, WorkSession } from '🍎/lib/activity/history';
@@ -216,6 +219,40 @@
 			unsubscribeFiles();
 		};
 	});
+	onMount(() =>
+		connectAppNavigation('review', {
+			read: () => ({
+				selectedVersionId: selected?.kind === 'version' ? selected.id : null,
+				selectedSessionId: selected?.kind === 'session' ? selected.id : null,
+				reading,
+				busy,
+				summaryDraft: summaryTarget !== null,
+			}),
+			navigate: async ({ versionId, sessionId }, signal) => {
+				if (busy || summaryTarget)
+					throw new AppError(
+						'UNSAVED_EDITS',
+						'Finish the Review operation or summary before navigating.',
+					);
+				await loadList();
+				if (listError) throw new AppError('REVIEW_UNAVAILABLE', listError);
+				if (versionId) {
+					// A requested version can be outside the latest list page.
+					await reviewService.read(versionId);
+					choose({ kind: 'version', id: versionId });
+					await waitUntil(() => !reading, signal);
+					if (error) throw new AppError('REVIEW_UNAVAILABLE', error);
+				} else if (sessionId) {
+					if (!sessions.some((item) => item.id === sessionId))
+						throw new AppError(
+							'SESSION_NOT_FOUND',
+							'List Review summaries and choose an existing ID.',
+						);
+					choose({ kind: 'session', id: sessionId });
+				} else choose(null);
+			},
+		}),
+	);
 </script>
 
 <section class="review-panel" aria-label="Review work">

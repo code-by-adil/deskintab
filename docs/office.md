@@ -138,3 +138,9 @@ See [`public/office/NOTICE.md`](../public/office/NOTICE.md) for upstream attribu
 `tests/office-startup.spec.ts` adds fault injection for script/metadata failures, startup deadlines, cancellation and close races, cache fallback/recovery, repeated worker cleanup, and PDF-only loading. `tests/office-print-mobile.spec.ts` checks native print command states, PDF downloads and shortcuts, compact dialogs, and an overlapping close/open request. Run all Office suites with `pnpm exec playwright test tests/office*.spec.ts`.
 
 See [the browser QA report](office-qa.md) for the deeper lifecycle/import tests, fixes, and remaining native UI, font, clipboard, and performance findings. Some native Writer commands still lack workspace integration. These tests cover the listed workflows.
+
+## Complete reads and focused navigation
+
+Use the continuation scopes in [the tool contract](webmcp-tool-contract.md#office-continuation-and-structural-editing) to read beyond the overview limits. `documents_select` makes a revision-checked paragraph/text selection visible. New `documents_edit` operations cover inline formatting and links, inserting and moving paragraphs, table dimensions, existing images and page layout. `docs text` now follows all body-text pages at one revision; `docs read PATH SCOPE.json` supports structured continuation.
+
+The integration uses LibreOffice's [text cursors](https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1text_1_1XTextCursor.html), [rich transferable interface](https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1datatransfer_1_1XTransferableSupplier.html), and native undo contexts. Rich transfer preserves inline attributes when moving a paragraph; it does not touch the host clipboard. The pinned build does not expose `XTextRangeMover` on Writer body text.

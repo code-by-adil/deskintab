@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { AppError } from '🍎/lib/errors';
+	import { connectAppNavigation, navigateApp } from '🍎/lib/desktop/navigation';
+	import { appNavigationContext } from '🍎/lib/desktop/navigation';
+
 	import { onMount } from 'svelte';
 	import ReviewPanel from './ReviewPanel.svelte';
 	import { revealDesktop } from '🍎/lib/desktop/files';
@@ -64,6 +68,31 @@
 			unsubscribe();
 		};
 	});
+	onMount(() =>
+		connectAppNavigation('activity', {
+			read: () => ({ tab, filter, ...(tab === 'review' ? appNavigationContext('review') : {}) }),
+			navigate: async ({ tab: nextTab, filter: nextFilter, versionId, sessionId }, signal) => {
+				const current = appNavigationContext('review');
+				if (current?.busy || current?.summaryDraft)
+					throw new AppError(
+						'UNSAVED_EDITS',
+						'Finish the Review operation or summary before navigating.',
+					);
+				if (versionId && sessionId)
+					throw new AppError('INVALID_INPUT', 'Select a version or a summary, not both.');
+				if ((versionId || sessionId) && nextTab === 'activity')
+					throw new AppError('INVALID_INPUT', 'Versions and summaries open in Review.');
+				if (nextFilter !== undefined) filter = nextFilter;
+				if (versionId || sessionId) {
+					tab = 'review';
+					await navigateApp('review', { versionId, sessionId }, signal);
+				} else if (nextTab) {
+					tab = nextTab;
+					if (nextTab === 'review') await navigateApp('review', {}, signal);
+				}
+			},
+		}),
+	);
 </script>
 
 <section class="activity-shell">

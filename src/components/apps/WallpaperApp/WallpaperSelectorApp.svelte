@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { setAppearance } from '🍎/lib/desktop/appearance';
 	import {
 		wallpapers_config,
 		wallpaperIds,
@@ -15,7 +16,7 @@
 	const current_wallpaper_thumb = $derived(`url(${preferences.wallpaper.image})`);
 
 	function change_wallpaper(wallpaperName: WallpaperID) {
-		preferences.wallpaper.id = wallpaperName;
+		setAppearance({ id: wallpaperName });
 	}
 
 	const preloaded = new Set<string>();
@@ -50,7 +51,11 @@
 
 				{#if wallpapers_config[preferences.wallpaper.id].type !== 'standalone'}
 					<label>
-						<input type="checkbox" bind:checked={preferences.wallpaper.canControlTheme} />
+						<input
+							type="checkbox"
+							checked={preferences.wallpaper.canControlTheme}
+							onchange={(event) => setAppearance({ matchTheme: event.currentTarget.checked })}
+						/>
 						Match the theme to the wallpaper
 					</label>
 				{/if}

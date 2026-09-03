@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { downloadWorkspaceFile } from '🍎/lib/workspace/download';
+	import { AppError } from '🍎/lib/errors';
+	import { connectAppNavigation } from '🍎/lib/desktop/navigation';
+
 	import { onMount, tick } from 'svelte';
 	import BackIcon from '~icons/ph/caret-left';
 	import FolderIcon from '~icons/ph/folder';
@@ -83,7 +87,7 @@
 			const nextEntries = await workspaceService.list(path);
 			if (revision !== loadRevision) return;
 			entries = nextEntries;
-			if (path !== currentPath) {
+			if (path !== currentPath || pathToSelect) {
 				searchQuery = '';
 				searchMatches = [];
 			}
@@ -137,6 +141,15 @@
 		void revealDesktop({ path: entry.path }).catch((error) => {
 			actionError = error instanceof Error ? error.message : 'The file could not be opened.';
 		});
+	}
+
+	async function downloadEntry(entry: WorkspaceEntry) {
+		itemMenu = null;
+		try {
+			await downloadWorkspaceFile(entry.path);
+		} catch (cause) {
+			actionError = cause instanceof Error ? cause.message : String(cause);
+		}
 	}
 
 	async function openDialog(mode: Exclude<DialogMode, null>) {
@@ -425,6 +438,43 @@
 			unsubscribeCommands();
 		};
 	});
+	onMount(() =>
+		connectAppNavigation('finder', {
+			ready: () => !loading,
+			read: () => ({
+				path: currentPath,
+				query: searchQuery,
+				selectedPath: selectedPath || null,
+				loading,
+				visiblePaths: visibleEntries.map((item) => item.path),
+				error: actionError,
+			}),
+			navigate: async ({ query, selectedPath: requestedPath }) => {
+				if (dialogMode)
+					throw new AppError('DIALOG_OPEN', 'Finish or dismiss the Finder dialog first.');
+				if (query !== undefined) {
+					actionError = '';
+					searchQuery = query;
+					await updateSearch();
+					if (actionError) throw new AppError('SEARCH_FAILED', actionError);
+				}
+				if (requestedPath !== undefined) {
+					if (!requestedPath) {
+						selectedPath = '';
+						finderState.selectedPath = '';
+					} else {
+						const entry = visibleEntries.find((item) => item.path === requestedPath);
+						if (!entry)
+							throw new AppError(
+								'FILE_NOT_VISIBLE',
+								'Reveal its parent folder or clear the search before selecting this file.',
+							);
+						selectEntry(entry);
+					}
+				}
+			},
+		}),
+	);
 </script>
 
 <svelte:window
@@ -586,6 +636,9 @@
 				disabled={protectedPaths.has(itemMenu.entry.path)}>Rename…</button
 			>
 			<button onclick={() => runItemMenuAction(duplicateEntry)}>Duplicate</button>
+			{#if itemMenu.entry.kind === 'file'}<button onclick={() => downloadEntry(itemMenu!.entry)}
+					>Download</button
+				>{/if}
 			<button
 				onclick={() => runItemMenuAction(trashEntry)}
 				disabled={protectedPaths.has(itemMenu.entry.path)}>Move to Trash</button

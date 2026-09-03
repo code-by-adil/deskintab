@@ -53,6 +53,29 @@ const values = {
 };
 export const sheetTools: WebMCP.ModelContextTool[] = [
 	defineTool({
+		name: 'sheets_select',
+		title: 'Select workbook cells',
+		description:
+			'Show a sheet and select its cell range at the latest sheets_read revision. Changes visible selection without editing cells.',
+		annotations: { readOnlyHint: false, untrustedContentHint: false },
+		inputSchema: {
+			type: 'object',
+			required: ['path', 'expectedRevision', 'range'],
+			properties: { path, expectedRevision, sheet, range },
+			additionalProperties: false,
+		},
+		async execute(input, { signal }) {
+			const result = await sheetsService.selectWorkbook(
+				absolutePath(input, 'path'),
+				input.expectedRevision,
+				input,
+				signal,
+			);
+			return successfulResult(result, 'Selected cells in Sheets.');
+		},
+	}),
+
+	defineTool({
 		name: 'sheets_create',
 		title: 'Create a workbook',
 		description:
@@ -98,7 +121,7 @@ export const sheetTools: WebMCP.ModelContextTool[] = [
 		annotations: { readOnlyHint: false, untrustedContentHint: true },
 		inputSchema: {
 			type: 'object',
-			properties: { path, sheet, range },
+			properties: { path, sheet, range, includeFormatting: { type: 'boolean', default: false } },
 			additionalProperties: false,
 		},
 		async execute(input, { signal }) {
@@ -129,6 +152,80 @@ export const sheetTools: WebMCP.ModelContextTool[] = [
 					oneOf: [
 						{
 							type: 'object',
+							required: ['type', 'action'],
+							properties: {
+								type: { const: 'sheet' },
+								action: { enum: ['add', 'rename', 'remove', 'move'] },
+								sheet,
+								name: sheet,
+								index: { type: 'integer', minimum: 0, maximum: 1000 },
+							},
+							additionalProperties: false,
+						},
+						{
+							type: 'object',
+							required: ['type', 'axis', 'action', 'index', 'count'],
+							properties: {
+								type: { const: 'structure' },
+								sheet,
+								axis: { enum: ['rows', 'columns'] },
+								action: { enum: ['insert', 'remove'] },
+								index: { type: 'integer', minimum: 0 },
+								count: { type: 'integer', minimum: 1, maximum: 100 },
+							},
+							additionalProperties: false,
+						},
+						{
+							type: 'object',
+							required: ['type', 'range', 'column'],
+							properties: {
+								type: { const: 'sort' },
+								sheet,
+								range,
+								column: {
+									type: 'integer',
+									minimum: 0,
+									description: 'Zero-based column within range.',
+								},
+								ascending: { type: 'boolean', default: true },
+								header: { type: 'boolean', default: true },
+							},
+							additionalProperties: false,
+						},
+						{
+							type: 'object',
+							required: ['type', 'range', 'value'],
+							properties: {
+								type: { const: 'filter' },
+								sheet,
+								range,
+								column: { type: 'integer', minimum: 0 },
+								value: {
+									type: ['string', 'number', 'null'],
+									description: 'Exact match, null clears filtering.',
+								},
+								header: { type: 'boolean', default: true },
+							},
+							additionalProperties: false,
+						},
+						{
+							type: 'object',
+							required: ['type', 'range'],
+							properties: {
+								type: { const: 'merge' },
+								sheet,
+								range,
+								merge: {
+									type: 'boolean',
+									default: true,
+									description: 'False unmerges. Merge rejects nonempty cells except top-left.',
+								},
+							},
+							additionalProperties: false,
+						},
+
+						{
+							type: 'object',
 							required: ['type', 'range', 'values'],
 							properties: { type: { const: 'cells' }, sheet, range, values },
 							additionalProperties: false,
@@ -141,6 +238,14 @@ export const sheetTools: WebMCP.ModelContextTool[] = [
 								sheet,
 								range,
 								bold: { type: 'boolean' },
+								italic: { type: 'boolean' },
+								underline: { type: 'boolean' },
+								wrap: { type: 'boolean' },
+								fontName: { type: 'string', maxLength: 200 },
+								fontSize: { type: 'number', exclusiveMinimum: 0, maximum: 500 },
+								align: { enum: ['left', 'center', 'right'] },
+								columnWidthMm: { type: 'number', exclusiveMinimum: 0, maximum: 500 },
+								rowHeightMm: { type: 'number', exclusiveMinimum: 0, maximum: 500 },
 								autoFit: {
 									type: 'boolean',
 									description: 'Fit columns to content.',
@@ -173,14 +278,16 @@ export const sheetTools: WebMCP.ModelContextTool[] = [
 	}),
 	defineTool({
 		name: 'sheets_chart',
-		title: 'Add column chart',
+		title: 'Create, update or remove a chart',
 		description:
-			'Add linked editable column chart at fresh revision/new name. First row: series; first column: categories; rest: numbers. Recalculates with cells; saves.',
+			'Create/update/remove a linked chart at fresh revision. Supports column, bar, line, pie, area. First row: series; first column: categories; rest: numbers. Recalculates with cells; saves.',
 		annotations: { readOnlyHint: false, untrustedContentHint: true },
 		inputSchema: {
 			type: 'object',
-			required: ['path', 'expectedRevision', 'range', 'name'],
+			required: ['path', 'expectedRevision', 'name'],
 			properties: {
+				action: { enum: ['create', 'update', 'remove'], default: 'create' },
+				kind: { enum: ['column', 'bar', 'line', 'pie', 'area'] },
 				path,
 				expectedRevision,
 				sheet,
@@ -198,7 +305,7 @@ export const sheetTools: WebMCP.ModelContextTool[] = [
 				'agent',
 				signal,
 			);
-			return successfulResult(result, `Created ${result.chart.name} in ${result.entry.path}.`);
+			return successfulResult(result, `Updated ${result.chart.name} in ${result.entry.path}.`);
 		},
 	}),
 	defineTool({

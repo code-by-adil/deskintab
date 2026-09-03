@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { AppError } from '🍎/lib/errors';
+	import { connectAppNavigation } from '🍎/lib/desktop/navigation';
+
 	import { onMount } from 'svelte';
 	import WorkspacePacks from './WorkspacePacks.svelte';
 	import HomeIcon from '~icons/mdi/home-outline';
@@ -314,6 +317,23 @@
 			clearPending();
 		};
 	});
+	onMount(() =>
+		connectAppNavigation('home', {
+			ready: () => !loading,
+			read: () => ({ pane, skillPath: skill?.path ?? null, dirty, busy }),
+			navigate: async ({ pane: nextPane, skillPath }) => {
+				if (!guardNavigation()) throw new AppError('UNSAVED_EDITS', error);
+				if (skillPath && nextPane && nextPane !== 'toolbox')
+					throw new AppError('INVALID_INPUT', 'A skill opens in the toolbox pane.');
+				if (skillPath) {
+					const record = await homeService.readSkill(skillPath);
+					if (!guardNavigation()) throw new AppError('UNSAVED_EDITS', error);
+					setSkill(record);
+				}
+				choosePane(skillPath ? 'toolbox' : (nextPane ?? pane));
+			},
+		}),
+	);
 </script>
 
 <svelte:window

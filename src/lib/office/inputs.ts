@@ -1,3 +1,4 @@
+import { extendedDocumentOperation } from './document-edit-inputs';
 import { AppError } from '../errors';
 import type { DocumentBlock, DocumentOperation } from './office';
 
@@ -48,6 +49,8 @@ export function documentBlocks(value: unknown): DocumentBlock[] {
 export function documentOperation(value: unknown): DocumentOperation {
 	if (!value || typeof value !== 'object') invalid('Provide an operation object.');
 	const op = value as Record<string, unknown>;
+	const extended = extendedDocumentOperation(op);
+	if (extended) return extended;
 	if (op.type === 'append') return { type: 'append', blocks: documentBlocks(op.blocks) };
 	if (op.type === 'insert-image') {
 		const imagePath = text(op.imagePath, 'imagePath', false);
@@ -93,4 +96,51 @@ export function documentOperation(value: unknown): DocumentOperation {
 		};
 	}
 	return invalid('operation.type must be replace, paragraph, table-cell, append, or insert-image.');
+}
+
+export type DocumentReadInput = {
+	includeFormatting?: boolean;
+	scope: 'overview' | 'text' | 'paragraphs' | 'tables' | 'table' | 'images';
+	offset: number;
+	limit: number;
+	textOffset: number;
+	maxChars: number;
+	table?: string;
+	expectedRevision?: number;
+};
+export function documentReadInput(value: unknown): DocumentReadInput {
+	if (!value || typeof value !== 'object') invalid('Provide a document read scope.');
+	const input = value as Record<string, unknown>;
+	const scope = input.scope ?? 'overview';
+	if (input.includeFormatting !== undefined && typeof input.includeFormatting !== 'boolean')
+		invalid('includeFormatting must be boolean.');
+	if (input.includeFormatting && (scope !== 'paragraphs' || input.limit !== 1))
+		invalid('Formatting reads require scope paragraphs and limit 1.');
+	if (!['overview', 'text', 'paragraphs', 'tables', 'table', 'images'].includes(String(scope)))
+		invalid('Unknown document read scope.');
+	function integer(key: string, fallback: number, max: number) {
+		const n = input[key] ?? fallback;
+		if (
+			typeof n !== 'number' ||
+			!Number.isSafeInteger(n) ||
+			n < (key === 'limit' || key === 'maxChars' ? 1 : 0) ||
+			n > max
+		)
+			invalid(`Invalid ${key}.`);
+		return n;
+	}
+	if (scope === 'table' && (typeof input.table !== 'string' || !input.table))
+		invalid('Supply a table name from documents_read.');
+	return {
+		scope: scope as DocumentReadInput['scope'],
+		includeFormatting: input.includeFormatting as boolean | undefined,
+		offset: integer('offset', 0, 100000000),
+		limit: integer('limit', 50, 500),
+		textOffset: integer('textOffset', 0, 100000000),
+		maxChars: integer('maxChars', 100000, 100000),
+		...(scope === 'table' ? { table: String(input.table) } : {}),
+		...(input.expectedRevision === undefined
+			? {}
+			: { expectedRevision: officeRevision(input.expectedRevision) }),
+	};
 }

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { connectWindow, appNavigationContext } from '🍎/lib/desktop/navigation';
+	import { AppError } from '🍎/lib/errors';
 	import { onMount } from 'svelte';
 	import { sineInOut } from 'svelte/easing';
 	import { elevation } from '🍎/actions';
@@ -207,6 +209,40 @@
 	}
 
 	onMount(() => {
+		const disconnectWindow = connectWindow(app_id, {
+			read: () => ({
+				open: apps.open[app_id],
+				minimized: apps.minimized[app_id],
+				maximized: is_maximized,
+				x,
+				y,
+			}),
+			control: async ({ action, x: nextX, y: nextY }) => {
+				if (action === 'close') {
+					if (
+						app_id === 'activity' &&
+						(appNavigationContext('review')?.summaryDraft || appNavigationContext('review')?.busy)
+					)
+						throw new AppError(
+							'UNSAVED_EDITS',
+							'Finish the Review operation or summary before closing Activity.',
+						);
+					await closeApp();
+					if (apps.open[app_id])
+						throw new AppError(
+							'UNSAVED_EDITS',
+							'Save or discard pending edits before closing this app.',
+						);
+				} else if (action === 'minimize') minimizeApp();
+				else {
+					apps.minimized[app_id] = false;
+					focusApp();
+					if (action === 'maximize' && !is_maximized) await maximizeApp();
+					if ((action === 'restore' || action === 'move') && is_maximized) await maximizeApp();
+					if (action === 'move') clampPosition(nextX, nextY);
+				}
+			},
+		});
 		const parent = windowEl?.parentElement;
 		if (windowEl && parent) {
 			const maxX = Math.max(8, parent.clientWidth - windowEl.offsetWidth - 8);
@@ -231,6 +267,7 @@
 			if (command === 'zoom') void maximizeApp();
 		});
 		return () => {
+			disconnectWindow();
 			resizeObserver.disconnect();
 			unsubscribeCommands();
 		};

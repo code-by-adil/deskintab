@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { createCalculatorState, inputCalculator } from '🍎/lib/calculator';
+	import {
+		calculatorState as calculator,
+		calculatorInput,
+	} from '🍎/lib/desktop/calculator-state.svelte';
 	import { subscribeToDesktopCommands } from '🍎/lib/desktop/commands';
 	import { apps } from '🍎/state/apps.svelte';
 
-	const calculator = $state(createCalculatorState());
 	let keyboardRoot: HTMLElement;
 	let copyMessage = $state('');
 	let copyTimer: ReturnType<typeof setTimeout>;
@@ -39,7 +41,7 @@
 
 	function input(key: string) {
 		copyMessage = '';
-		inputCalculator(calculator, key);
+		calculatorInput(key);
 	}
 
 	async function copyResult() {

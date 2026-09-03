@@ -33,7 +33,7 @@ test('desktop context reads Finder selection without opening or saving anything'
 	const activity = await ok(page, 'activity_list', { limit: 100 });
 	const context = await ok(page, 'desktop_get_context');
 	expect(context.activeApp).toBe('finder');
-	expect(context.context.finder).toEqual({ path: '/Documents', selectedPath: path });
+	expect(context.context.finder).toMatchObject({ path: '/Documents', selectedPath: path });
 	expect(context.context.tasks).toBeNull();
 	expect(context.context.canvas).toBeNull();
 	expect(await ok(page, 'files_list', { path: '/System' })).toEqual(files);

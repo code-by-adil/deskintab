@@ -41,6 +41,52 @@ const objectFields = {
 	text: { type: 'string', maxLength: 20000 },
 	fill: { type: 'string', pattern: '^#[a-fA-F0-9]{6}$' },
 	color: { type: 'string', pattern: '^#[a-fA-F0-9]{6}$' },
+	fontFamily: {
+		type: 'integer',
+		enum: [1, 2, 3, 5, 6, 7, 8, 9],
+		description:
+			'Excalidraw font family ID; 1 Virgil, 2 Helvetica, 3 Cascadia, 5 Excalifont, 6 Nunito, 7 Lilita One, 8 Comic Shanns, 9 Liberation Sans.',
+	},
+	fillStyle: { type: 'string', enum: ['solid', 'hachure', 'cross-hatch', 'zigzag'] },
+	strokeStyle: { type: 'string', enum: ['solid', 'dashed', 'dotted'] },
+	textAlign: { type: 'string', enum: ['left', 'center', 'right'] },
+	verticalAlign: { type: 'string', enum: ['top', 'middle', 'bottom'] },
+	startArrowhead: {
+		type: ['string', 'null'],
+		enum: [
+			null,
+			'arrow',
+			'bar',
+			'dot',
+			'circle',
+			'circle_outline',
+			'triangle',
+			'triangle_outline',
+			'diamond',
+			'diamond_outline',
+			'crowfoot_one',
+			'crowfoot_many',
+			'crowfoot_one_or_many',
+		],
+	},
+	endArrowhead: {
+		type: ['string', 'null'],
+		enum: [
+			null,
+			'arrow',
+			'bar',
+			'dot',
+			'circle',
+			'circle_outline',
+			'triangle',
+			'triangle_outline',
+			'diamond',
+			'diamond_outline',
+			'crowfoot_one',
+			'crowfoot_many',
+			'crowfoot_one_or_many',
+		],
+	},
 	fontSize: { type: 'number', minimum: 12, maximum: 72 },
 	link: { type: ['string', 'null'], description: 'Existing workspace file or null.' },
 	imagePath: {
@@ -145,7 +191,7 @@ export const canvasTools: WebMCP.ModelContextTool[] = [
 		name: 'canvas_edit',
 		title: 'Create or edit diagram',
 		description:
-			'Apply ordered edits atomically with Review/mounted undo. Create via create:{title}; edit at canvas_read revision. Rejects stale edits/gestures. Preserve unrelated IDs. One image dimension keeps aspect ratio. Arrow endpoints bind IDs and preserve ID/label on update. Shape text edits label; deletion removes label/arrows. Move strokes via x/y, reshape via points. Max2000 elements/20MB. Infinite canvas ignores create width/height.',
+			'Apply ordered edits atomically with Review/mounted undo. Create via create:{title}; edit at canvas_read revision. Rejects stale edits/gestures. Preserve unrelated IDs. One image dimension keeps aspect ratio. Arrow endpoints bind IDs and preserve ID/label on update. Shape text edits label; deletion removes label/arrows. Move strokes via x/y, reshape via points. reorder sets layers back to front; bound labels follow their shapes. Max2000 elements/20MB. Infinite canvas ignores create width/height.',
 		annotations: { readOnlyHint: false, untrustedContentHint: true },
 		inputSchema: {
 			type: 'object',
@@ -168,6 +214,21 @@ export const canvasTools: WebMCP.ModelContextTool[] = [
 					maxItems: 100,
 					items: {
 						oneOf: [
+							{
+								type: 'object',
+								required: ['op', 'ids'],
+								properties: {
+									op: { const: 'reorder' },
+									ids: {
+										type: 'array',
+										maxItems: 2000,
+										items: { type: 'string' },
+										description:
+											'Every non-bound-label element ID exactly once, back to front. Bound text moves with its shape.',
+									},
+								},
+								additionalProperties: false,
+							},
 							{
 								type: 'object',
 								required: ['op', 'object'],
