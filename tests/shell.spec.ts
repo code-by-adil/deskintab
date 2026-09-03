@@ -50,15 +50,22 @@ test('Control Center supports keyboard controls and keeps a manual theme choice'
 	const toggle = page.getByRole('button', { name: 'Control Center', exact: true });
 	await toggle.click();
 	const controls = page.locator('#control-center');
+	const lightMode = controls.getByRole('button', { name: 'Light mode', exact: true });
 	const darkMode = controls.getByRole('button', { name: 'Dark mode', exact: true });
-	await expect(darkMode).toBeFocused();
+	await expect(lightMode).toBeFocused();
 	await page.keyboard.press('Tab');
-	await expect(controls.getByRole('button', { name: 'Animations', exact: true })).toBeFocused();
+	await expect(darkMode).toBeFocused();
+	await expect(controls.getByRole('button', { name: 'Animations', exact: true })).toHaveCount(0);
+	await expect(controls.getByText('Accent color', { exact: true })).toHaveCount(0);
 	await expect(controls.locator('button button')).toHaveCount(0);
 
-	const wasDark = await darkMode.getAttribute('aria-pressed');
+	await lightMode.click();
+	await expect(lightMode).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.locator('body')).toHaveClass('light');
 	await darkMode.click();
-	await expect(darkMode).toHaveAttribute('aria-pressed', wasDark === 'true' ? 'false' : 'true');
+	await expect(darkMode).toHaveAttribute('aria-pressed', 'true');
+	await expect(lightMode).toHaveAttribute('aria-pressed', 'false');
+	await expect(page.locator('body')).toHaveClass('dark');
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 	await expect
 		.poll(() =>
@@ -73,7 +80,14 @@ test('Control Center supports keyboard controls and keeps a manual theme choice'
 
 	await page.reload();
 	await toggle.click();
-	await expect(darkMode).toHaveAttribute('aria-pressed', wasDark === 'true' ? 'false' : 'true');
+	await expect(darkMode).toHaveAttribute('aria-pressed', 'true');
+	await page.setViewportSize({ width: 390, height: 844 });
+	const bounds = await controls.boundingBox();
+	expect(bounds!.x).toBeGreaterThanOrEqual(0);
+	expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+	await controls.getByRole('button', { name: 'Open Wallpapers', exact: true }).click();
+	await expect(controls).toHaveCount(0);
+	await expect(page.locator('[data-app-id="wallpapers"]')).toBeVisible();
 });
 
 for (const stored of [
@@ -135,9 +149,9 @@ for (const storage of ['legacy', 'current', 'both'] as const) {
 			await expect(
 				controls.getByRole('button', { name: 'Dark mode', exact: true }),
 			).toHaveAttribute('aria-pressed', 'true');
-			await expect(
-				controls.getByRole('button', { name: 'Animations', exact: true }),
-			).toHaveAttribute('aria-pressed', 'false');
+			await expect(controls.getByRole('button', { name: 'Animations', exact: true })).toHaveCount(
+				0,
+			);
 			await expect(
 				controls.getByRole('button', { name: 'Open Wallpapers', exact: true }),
 			).toBeVisible();

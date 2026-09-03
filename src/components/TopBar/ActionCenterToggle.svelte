@@ -1,8 +1,5 @@
 <script lang="ts">
-	import { sineIn } from 'svelte/easing';
-	import { fade } from 'svelte/transition';
 	import { click_outside, elevation, focus_outside } from '🍎/actions';
-	import { fade_out } from '🍎/helpers/fade.ts';
 	import SwitchSvg from '../SVG/SwitchSVG.svelte';
 	import ActionCenter from './ActionCenter.svelte';
 
@@ -35,12 +32,7 @@
 	</button>
 
 	{#if visible}
-		<div
-			in:fade={{ easing: sineIn, duration: 150 }}
-			out:fade_out
-			class="menu-parent"
-			use:elevation={'menubar-menu-parent'}
-		>
+		<div class="menu-parent" use:elevation={'menubar-menu-parent'}>
 			<ActionCenter onclose={hide} />
 		</div>
 	{/if}
@@ -73,7 +65,7 @@
 			transform: scale(var(--scale));
 			transform-origin: center center;
 
-			transition: transform 100ms ease;
+			transition: none;
 
 			background-color: hsla(0, 0%, 96%, 0.3);
 		}
