@@ -27,7 +27,7 @@
 			aria-valuenow={100 - $progress_val}
 			aria-valuemin={0}
 			aria-valuemax={100}
-			aria-valuetext="Starting Deskstead"
+			aria-valuetext="Starting DeskInTab"
 		>
 			<div class="indicator" style:translate="-{$progress_val}% 0"></div>
 		</div>

@@ -71,7 +71,7 @@ async function openDesktop(page: Page, withWebMCP = false) {
 	if (withWebMCP) await installWebMCPHarness(page);
 
 	await page.goto('/', { waitUntil: 'domcontentloaded' });
-	await expect(page).toHaveTitle('Deskstead');
+	await expect(page).toHaveTitle('DeskInTab');
 	await expect(page.locator('.background-cover')).toBeVisible();
 	await expect(page.locator('[data-app-id="finder"]')).toBeVisible();
 

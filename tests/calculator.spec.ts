@@ -62,7 +62,7 @@ for (const [name, sequence, expected] of cases) {
 
 async function openCalculator(page: Page) {
 	await page.goto('/');
-	await expect(page).toHaveTitle('Deskstead');
+	await expect(page).toHaveTitle('DeskInTab');
 	await page.getByRole('button', { name: 'Launch Calculator app' }).click();
 	const calculator = page.getByRole('application', {
 		name: 'Calculator keyboard input',

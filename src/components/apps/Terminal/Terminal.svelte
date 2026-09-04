@@ -21,7 +21,7 @@
 
 	function prompt() {
 		const cwd = terminalService.cwd.replace('/Projects', '~');
-		return `\x1b[38;5;39mguest@deskstead\x1b[0m:\x1b[38;5;75m${cwd}\x1b[0m $ `;
+		return `\x1b[38;5;39mguest@deskintab\x1b[0m:\x1b[38;5;75m${cwd}\x1b[0m $ `;
 	}
 
 	function isFinished(status: TerminalJob['status']) {
@@ -64,7 +64,7 @@
 			if (!historical) terminal.write('\r\n');
 			const label = run.actor === 'agent' ? '\x1b[38;5;75magent\x1b[0m' : 'guest';
 			terminal.write(
-				`${label}@deskstead:${run.cwd.replace('/Projects', '~')} $ ${run.command}\r\n`,
+				`${label}@deskintab:${run.cwd.replace('/Projects', '~')} $ ${run.command}\r\n`,
 			);
 		}
 		if (!isFinished(run.status)) {
@@ -120,7 +120,7 @@
 		instance.loadAddon(fitAddon);
 		instance.open(node);
 		fitAddon.fit();
-		instance.write('\x1b[1mDeskstead Terminal\x1b[0m\r\n');
+		instance.write('\x1b[1mDeskInTab Terminal\x1b[0m\r\n');
 		instance.write(
 			'\x1b[38;5;244mShared workspace · commands stay inside this desktop\x1b[0m\r\n\r\n',
 		);

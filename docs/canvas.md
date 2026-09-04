@@ -18,7 +18,7 @@ New files use native Excalidraw v2 JSON:
 {
 	"type": "excalidraw",
 	"version": 2,
-	"source": "deskstead",
+	"source": "deskintab",
 	"title": "A shared sketch",
 	"elements": [],
 	"appState": { "viewBackgroundColor": "#ffffff", "gridSize": null },

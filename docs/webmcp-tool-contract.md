@@ -1,6 +1,6 @@
 # WebMCP tool contract
 
-Deskstead registers 89 tools with `document.modelContext.registerTool()` in the top-level page. The tools call the same TypeScript services as the visible apps. Mutations return the saved result after updating the desktop. If an app cannot display a completed save, the result includes a display warning so the agent can distinguish the save from the display failure.
+DeskInTab registers 89 tools with `document.modelContext.registerTool()` in the top-level page. The tools call the same TypeScript services as the visible apps. Mutations return the saved result after updating the desktop. If an app cannot display a completed save, the result includes a display warning so the agent can distinguish the save from the display failure.
 
 One tab owns the saved workspace at a time. A browser Web Lock is acquired before mounting IndexedDB. A second tab shows a close-and-reload message and registers no tools. Agents should connect to the open desktop or reopen the workspace after its previous tab closes.
 

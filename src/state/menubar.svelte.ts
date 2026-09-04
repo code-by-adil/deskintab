@@ -119,7 +119,7 @@ export function getActiveMenus(): Record<string, MenuConfig> {
 		apple: {
 			title: 'Apple',
 			menu: {
-				about: { title: 'About Deskstead', disabled: true, breakAfter: true },
+				about: { title: 'About DeskInTab', disabled: true, breakAfter: true },
 				home: { title: 'Home & Workspace…', action: () => openApp('home') },
 				wallpaper: {
 					title: 'Desktop & Wallpaper…',

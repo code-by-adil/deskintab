@@ -29,7 +29,7 @@ export const isCanvasPath = (path: string) =>
 export const emptyScene = (title = 'Untitled'): Scene => ({
 	type: 'excalidraw',
 	version: 2,
-	source: 'deskstead',
+	source: 'deskintab',
 	title,
 	elements: [],
 	appState: { viewBackgroundColor: '#ffffff', gridSize: null },
@@ -181,7 +181,7 @@ export function parseCanvasFile(value: unknown): CanvasFile {
 	return {
 		type: 'excalidraw',
 		version: 2,
-		source: 'deskstead',
+		source: 'deskintab',
 		title: boundedText(data.title ?? 'Untitled', 'Title', 120),
 		elements,
 		appState: {

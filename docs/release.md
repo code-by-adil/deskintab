@@ -1,5 +1,21 @@
 # Release review
 
+## Current deployment: DeskInTab
+
+Live at [deskintab.dgkhan08.workers.dev](https://deskintab.dgkhan08.workers.dev/), deployed on 4 September 2026. Worker: `deskintab`. Version: `c7848052-156b-42ab-a8fd-b47f36e110bd`.
+
+The app title, install manifest, metadata, terminal, menus, sample workspace content, Canvas source metadata, package, and current documentation use DeskInTab. Historical entries below retain the names and version IDs used at the time. Existing user documents are not rewritten.
+
+The previous Worker's production and preview URLs are disabled in Cloudflare. Its production address returns HTTP 404; the new address returns HTTP 200. The old Worker is retained for recovery, not public use. No custom domains or DNS records were changed. Deploy future updates with `wrangler deploy` using the checked-in `deskintab` configuration; deploying an old checkout could reactivate the retired address.
+
+Validation: Svelte checks passed with zero errors or warnings; all three changed Svelte files passed the autofixer; changed code formatting and `git diff --check` passed. Production build and Wrangler dry run passed. Five selected Chromium tests passed: Calculator cold launch, desktop rendering, cross-app WebMCP workflow, compact desktop, and Writer editing and persistence. The full suite was not rerun. Existing bundler warnings remain.
+
+Live verification confirmed the DeskInTab title, rendered desktop and terminal banner/prompt, with no captured browser warnings or errors. HTML, install manifest, service worker, and Office iframe HTML match the local build byte for byte and retain COOP/COEP headers. Native WebMCP invocation in Codex Browser still reports that the site's configuration exceeds supported limits; callback tests passing does not resolve that client limit.
+
+The new origin has separate browser storage. Workspace packs are required to transfer existing work; disabling the previous URL does not migrate or erase its local IndexedDB data.
+
+## Historical review
+
 Reviewed on 3 September 2026. MIT licensing for the project's own work is in place. The media review remains open, so this is not a declaration that every bundled asset is ready for public distribution.
 
 ## Changes made
@@ -16,13 +32,12 @@ Reviewed on 3 September 2026. MIT licensing for the project's own work is in pla
 | Item                                                                                                   | Action                                                                                                                                                               |
 | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/assets/wallpapers/`                                                                               | Establish permission for each retained image or replace it. Names and file locations are not licensing evidence.                                                     |
-| `public/app-icons/`, `public/cursors/`, `public/favicon.ico`                         | Remove unused files and document the rights to the assets still used by the app.                                                                                     |
+| `public/app-icons/`, `public/cursors/`, `public/favicon.ico`                                           | Remove unused files and document the rights to the assets still used by the app.                                                                                     |
 | Apple icons in `src/components/TopBar/MenuBar.svelte` and `src/components/Desktop/BootupScreen.svelte` | Replace with project branding or establish permission for this use.                                                                                                  |
 | `public/sounds/mac-startup-sound.mp3`                                                                  | Replace or remove the sound and its startup, prefetch, and precache references unless permission is established.                                                     |
 | `public/cover-image.png`                                                                               | Replace the current cover with an accurate screenshot of this project after the media review. It is currently included in the precache list.                         |
 | `docs/references/desktop-reference.png`                                                                | Keep the visual reference for development, but review its redistribution rights before publishing the repository.                                                    |
 | Office and Canvas distribution                                                                         | Keep their notices and license texts. Verify that upstream source links resolve to the shipped runtime and that separately copied fonts retain the required notices. |
-| `wrangler.jsonc`                                                                                       | Confirm the deployment target. The configured name is `webmcp-desktop`. Confirm that this is the intended destination before deploying.                              |
 
 The unused icon directories contain 106 files totaling 8.4 MiB. They include App Store, Calendar, Contacts, DevUtils, FaceTime, Keynote, Launchpad, Mail, Maps, Messages, Music, News, Photos, Podcasts, the unused social-link icon, Safari, TV, Ukraine, View Source, and VS Code. None is an installed desktop app. Check source references before deleting files; the System Preferences icon is still used by the update prompt.
 
@@ -60,3 +75,21 @@ The initial generated report contains entries without license text for Radix UI 
 Open the production preview, check the startup screen, and try the handoff workflow with a supported WebMCP connection. Download the output and confirm it survives a reload. Check the final hosting headers and preserve the workspace's origin when updating a deployment. A new origin has separate browser data.
 
 The package is marked `private: true` to prevent accidental npm publication. It does not make the source repository private or change the MIT license. This project is released as source and a static website, not as an npm library.
+
+## Cloudflare deployment — 3 September 2026
+
+Deployed to [deskstead.dgkhan08.workers.dev](https://deskstead.dgkhan08.workers.dev/) using the `deskstead` Worker. `workers_dev` is explicitly enabled and `routes` is empty. No existing custom domains or DNS records were changed. Version: `c58971b6-dba5-459f-a7eb-5b0efb508994`.
+
+For maintainers updating this deployment, run `wrangler deploy` while signed in to the deployment account. Wrangler builds the app and uploads `dist/`. Preserve `public/_headers` so Office receives its required cross-origin isolation headers. If deploying a separate copy, choose your own Worker name in `wrangler.jsonc` first.
+
+The production build, Wrangler dry run, Svelte checks (zero errors or warnings), Wrangler configuration formatting, and `git diff --check` passed. Four selected Chromium tests passed: desktop rendering, the Files/Notepad/Terminal/Activity WebMCP workflow, real Writer editing and persistence, and the personal workspace transfer workflow. The full suite was not rerun for deployment.
+
+Live verification confirmed the desktop renders and Writer opens a saved `Untitled.odt`. The root page and Office iframe return the required COOP/COEP headers. Office runtime chunks are available with immutable caching, while the entry page and service worker revalidate.
+
+Native WebMCP verification in Codex Browser remains blocked: its tool discovery reports that the site's WebMCP configuration exceeds supported limits. The local callback tests passing does not resolve this client discovery failure. No tool schema or registration behavior was changed during deployment.
+
+## Cloudflare redeployment — 4 September 2026
+
+Redeployed the current local checkout to the same `deskstead.dgkhan08.workers.dev` address. Version: `3f4a5d01-f8dd-4710-83ed-74783cfd8769`. Cloudflare uploaded 27 changed assets and reused 869 existing assets. No custom domains or DNS records were changed.
+
+The production build, Svelte checks, Wrangler configuration formatting, and the same four selected Chromium workflow tests passed. The live HTML, entry JavaScript, service worker, and Office iframe HTML matched the local build byte for byte, with the required COOP/COEP headers. The desktop loaded after refresh. Native WebMCP discovery still reports that the configuration exceeds Codex Browser's supported limits.

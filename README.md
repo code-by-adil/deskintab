@@ -1,14 +1,14 @@
-# Deskstead
+# DeskInTab
 
-**A WebMCP-enabled virtual operating system for you and your agent.**
+**An operating system in your browser, shared by you and your AI agent.**
 
-Give your agent a computer to work in. Deskstead brings an office suite, a drawing canvas, a Bash terminal, and saved project context into one browser desktop. [WebMCP](https://developer.chrome.com/docs/ai/webmcp) connects the agent to the apps' capabilities, so it can use them together to carry out a complete piece of work.
+Give your agent a computer to work in. DeskInTab brings an office suite, a drawing canvas, a Bash terminal, and saved project context into one browser desktop. [WebMCP](https://developer.chrome.com/docs/ai/webmcp) connects the agent to the apps' capabilities, so it can use them together to carry out a complete piece of work.
 
 Have it prepare a report with supporting analysis and diagrams, then review and refine the work together. The results stay as editable documents, workbooks, and drawings in your desktop. A saved handoff carries the context and next step into another agent session.
 
-[Open Deskstead](https://deskstead.dgkhan08.workers.dev/) · [Run locally](#run-locally) · [Try a handoff](#try-a-project-handoff) · [70 WebMCP tools](docs/webmcp-tool-contract.md)
+[Open DeskInTab](https://deskintab.dgkhan08.workers.dev/) · [Run locally](#run-locally) · [Try a handoff](#try-a-project-handoff) · [70 WebMCP tools](docs/webmcp-tool-contract.md)
 
-![An editable Word release brief in Documents beside its exported PDF in Preview.](docs/images/deskstead-documents.png)
+![An editable Word release brief in Documents beside its exported PDF in Preview.](docs/images/deskintab-documents.png)
 
 ## Documents you can edit and share
 
@@ -20,7 +20,7 @@ Use [Sheets](docs/sheets.md) for the supporting analysis. Your agent can build w
 
 Sketch an idea in [Canvas](docs/canvas.md) and ask your agent to develop it, or have it draw a diagram for your project. Both of you can edit the same shapes, text, and connections in Excalidraw. Export a PNG for a report and keep the editable drawing.
 
-![An agent-created delivery diagram in Canvas beside a project handoff with linked files, a next action, and a question for the user.](docs/images/deskstead-canvas.png)
+![An agent-created delivery diagram in Canvas beside a project handoff with linked files, a next action, and a question for the user.](docs/images/deskintab-canvas.png)
 
 ## Work across a whole project
 
@@ -28,7 +28,7 @@ Use Terminal when a task spans a folder of sources or needs repeatable processin
 
 Follow the commands and their results in the Terminal window. The shell runs `just-bash` inside the browser, with no network or host filesystem access.
 
-![Finder and Terminal share a project folder. Bash commands summarize a CSV, search interview notes, and extract text from a Word document.](docs/images/deskstead-terminal.png)
+![Finder and Terminal share a project folder. Bash commands summarize a CSV, search interview notes, and extract text from a Word document.](docs/images/deskintab-terminal.png)
 
 ## Collaborate and hand off the work
 
@@ -42,17 +42,17 @@ Save your working preferences and reusable skill instructions in [Home](docs/hom
 
 Your agent can also turn JSON records into a saved app through [App Studio](docs/studio.md). Search findings, filter records, and open their sources in an interface built for that dataset.
 
-The screenshots show a fictional Harbor project created through Deskstead's tools.
+The screenshots show a fictional Harbor project created through DeskInTab's tools.
 
 ## Try a project handoff
 
-Open Deskstead and connect a compatible WebMCP agent. A fresh workspace includes sample notes in `/Projects/Launch`. Try:
+Open DeskInTab and connect a compatible WebMCP agent. A fresh workspace includes sample notes in `/Projects/Launch`. Try:
 
 > Read /Projects/Launch. Prepare a formatted status report and draw a diagram of the remaining work. Save both in the project folder. Create a project handoff with links to the results, the next step, and any question you need me to answer.
 
 Review the files and answer in Projects. Ask a new agent session to read the saved project and continue. See the [workspace walkthrough](docs/personal-computer.md) for a longer example.
 
-The apps work without an agent. WebMCP requires a compatible browser or client and is experimental. Deskstead does not launch agents or schedule unattended work.
+The apps work without an agent. WebMCP requires a compatible browser or client and is experimental. DeskInTab does not launch agents or schedule unattended work.
 
 ## Keep your workspace
 
@@ -85,20 +85,10 @@ pnpm test:e2e
 
 The build writes a static site to `dist/`. Use `pnpm serve --host 127.0.0.1` for a local production preview. Hosting requires HTTPS and the cross-origin isolation headers in [Office hosting](docs/office.md#runtime-and-hosting). The [tool contract](docs/webmcp-tool-contract.md) documents integration and evaluation. The [release notes](docs/release.md) track validation and outstanding media attribution work.
 
-### Deploy to Cloudflare
-
-With Wrangler installed and signed in, check the Worker name in `wrangler.jsonc` for your deployment, then run:
-
-```bash
-wrangler deploy
-```
-
-Wrangler builds and uploads `dist/` as Workers Static Assets. Keep `public/_headers` for Office's cross-origin isolation. The hosted site has its own browser workspace. Transfer local work through a workspace pack.
-
 </details>
 
 ## License and credits
 
-Deskstead's original code and documentation use the [MIT license](LICENSE). Dependencies, fonts, and third-party media retain their own terms, documented in [third-party notices](THIRD_PARTY.md).
+DeskInTab's original code and documentation use the [MIT license](LICENSE). Dependencies, fonts, and third-party media retain their own terms, documented in [third-party notices](THIRD_PARTY.md).
 
-Deskstead is an independent project. Apple and macOS are trademarks of Apple Inc. References to those products or other projects do not imply affiliation or endorsement.
+DeskInTab is an independent project. Apple and macOS are trademarks of Apple Inc. References to those products or other projects do not imply affiliation or endorsement.

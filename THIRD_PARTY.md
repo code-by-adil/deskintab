@@ -1,6 +1,6 @@
 # Third-party notices
 
-The root [MIT license](LICENSE) covers Deskstead's original code and documentation. It does not replace the terms of dependencies, fonts, or third-party media.
+The root [MIT license](LICENSE) covers DeskInTab's original code and documentation. It does not replace the terms of dependencies, fonts, or third-party media.
 
 ## Desktop foundation
 

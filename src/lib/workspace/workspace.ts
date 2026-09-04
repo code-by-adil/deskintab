@@ -59,7 +59,7 @@ const SEED_VERSION = '/System/.seeded-v1';
 const seedFiles: Record<string, string> = {
 	'/Projects/Launch/brief.md': `# Launch brief
 
-This sample project tracks the Deskstead launch. Use it to try a report and handoff workflow.
+This sample project tracks the DeskInTab launch. Use it to try a report and handoff workflow.
 
 Read the notes in this folder, summarize completed work and open tasks, and save a status report beside the sources. Record any question that needs a human answer.
 `,
@@ -81,7 +81,7 @@ The desktop shell and persistent workspace are in place. A status report and a w
 - [ ] Prepare a concise project status report
 - [ ] Record the final demo video
 `,
-	'/Documents/Welcome.md': `# Welcome to Deskstead
+	'/Documents/Welcome.md': `# Welcome to DeskInTab
 
 A shared desktop for you and your AI agent.
 

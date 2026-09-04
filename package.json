@@ -1,7 +1,7 @@
 {
-	"name": "deskstead",
+	"name": "deskintab",
 	"version": "0.1.0",
-	"description": "A WebMCP-enabled virtual operating system where you and your agent work on documents, analyze data, draw diagrams, and carry projects across sessions.",
+	"description": "An operating system in your browser, where you and your AI agent share apps, files, and projects through WebMCP.",
 	"license": "MIT",
 	"private": true,
 	"type": "module",

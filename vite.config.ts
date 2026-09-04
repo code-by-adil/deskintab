@@ -76,11 +76,11 @@ export default defineConfig({
 				'**/*.mp3',
 			],
 			manifest: {
-				name: 'Deskstead',
-				short_name: 'Deskstead',
+				name: 'DeskInTab',
+				short_name: 'DeskInTab',
 				theme_color: '#ffffff',
 				description:
-					'A WebMCP-enabled virtual operating system where you and your agent work on documents, analyze data, draw diagrams, and carry projects across sessions.',
+					'An operating system in your browser, where you and your AI agent share apps, files, and projects through WebMCP.',
 				icons: [
 					{
 						src: 'app-icons/finder/128.png',

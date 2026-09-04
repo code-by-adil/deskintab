@@ -1,5 +1,7 @@
 {
-	"name": "webmcp-desktop",
+	"name": "deskintab",
+	"workers_dev": true,
+	"routes": [],
 	"compatibility_date": "2026-07-01",
 	// Build the Vite SPA before deploying, so ./dist exists when the assets are
 	// uploaded. Runs on `wrangler deploy` (including Cloudflare's CI).
