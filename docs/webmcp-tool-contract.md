@@ -4,6 +4,8 @@ DeskInTab registers 89 tools with `document.modelContext.registerTool()` in the 
 
 One tab owns the saved workspace at a time. A browser Web Lock is acquired before mounting IndexedDB. A second tab shows a close-and-reload message and registers no tools. Agents should connect to the open desktop or reopen the workspace after its previous tab closes.
 
+Discovery retains every schema validation rule, using local JSON Schema `$defs` / `$ref` for repeated subschemas. Full parameter prose remains available through `desktop_describe_tool`. The metadata regression test includes the production `origin` and `pageUrl` repeated on every tool: the installed Codex browser bridge counts those fields against its default 65,536-byte total descriptor budget. This is a client/version-specific default, not a WebMCP standard limit. The current catalog is 65,146 bytes at the production root URL; longer URLs and future tools require checking the full payload again. Native discovery is tested separately from callback tests.
+
 The implementation uses the [WebMCP specification](https://webmachinelearning.github.io/webmcp/), [Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api), [Chrome best practices](https://developer.chrome.com/docs/ai/webmcp/best-practices), and [OpenAI Site Tools guidance](https://learn.chatgpt.com/docs/webmcp). These were checked on September 3, 2026. Tools stay registered while the desktop is mounted because the whole workspace remains available across app switches. Each registration uses a lifecycle `AbortSignal`; each execution receives its own cancellation signal.
 
 ## Available tools

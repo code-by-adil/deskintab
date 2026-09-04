@@ -14,6 +14,13 @@
 /playwright-report/
 /test-results/
 
+# Original screen recordings kept locally for video editing
+/video/recordings/
+
+# Local video renders and intermediate editing files
+/video/*.mp4
+/scratch/
+
 # Local agent guidance, tooling, and visual references
 AGENTS.md
 /.agents/

@@ -2,7 +2,23 @@
 
 ## Current deployment: DeskInTab
 
-Live at [deskintab.dgkhan08.workers.dev](https://deskintab.dgkhan08.workers.dev/), deployed on 4 September 2026. Worker: `deskintab`. Version: `c7848052-156b-42ab-a8fd-b47f36e110bd`.
+Live at [deskintab.dgkhan08.workers.dev](https://deskintab.dgkhan08.workers.dev/), deployed on 4 September 2026. Worker: `deskintab`. Version: `69c1997e-fe3a-4c30-89a2-472c1306f541`.
+
+### Native WebMCP catalog fix
+
+Submission preparation on 4 September rechecked types (zero errors/warnings), all four metadata regression tests, changed-file formatting, and the production build. The metadata tests again measured 89 tools and 65,146 bytes for complete production descriptors. The build passed with existing bundler, chunk-size, and unresolved help-cursor warnings. This was a focused verification, not a new full-suite pass. The [narrated demonstration](https://youtu.be/42DKX0ZmOdk) is public and runs for 164.7 seconds.
+
+The installed Codex Browser bridge limits the complete discovery descriptors to 65,536 bytes, including each tool's origin and page URL. The previous production catalog contained 66,531 bytes despite passing the app-only metadata check. This is a client implementation constraint, not a WebMCP specification limit.
+
+Discovery now shares repeated schemas through local `$defs`/`$ref`, without removing validation rules or tools. All 89 tools remain registered. Complete production descriptors measure 65,146 bytes; the regression test includes the production URL and independently expands references to verify schema equivalence. The remaining margin is small, so future additions and longer deployment URLs must be measured again.
+
+Validation: type checking passed with zero errors/warnings; 21 focused Chromium tests passed; formatting, production build, and Wrangler dry run passed. Native discovery and real tool invocation now work in Codex Browser on both localhost and production. Canvas creation, revision-checked editing, and reload persistence passed locally. Production rehearsal has saved and read back project context, source files, a formula workbook/chart, an App Studio explorer, a Canvas diagram, a DOCX and one-page draft PDF, and linked tasks. The full 294-test suite was started separately; its final result is recorded below when available. The two previously documented PDF-to-Writer startup failures have recurred during this run.
+
+Deployment preserved the existing origin and workspace. Live HTML matches the local build byte for byte; HTTP 200 and required COOP/COEP headers were verified. No browser guardrails, Worker routes, or DNS settings were changed. See [the rehearsal record](submission-video-rehearsal.md) for capture corrections and the pending human decision.
+
+### Previous branding deployment
+
+Version `c7848052-156b-42ab-a8fd-b47f36e110bd` introduced the current branding. The following paragraphs describe that earlier deployment, before the native catalog fix above.
 
 The app title, install manifest, metadata, terminal, menus, sample workspace content, Canvas source metadata, package, and current documentation use DeskInTab. Historical entries below retain the names and version IDs used at the time. Existing user documents are not rewritten.
 

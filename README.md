@@ -6,7 +6,7 @@ Give your agent a computer to work in. DeskInTab brings an office suite, a drawi
 
 Have it prepare a report with supporting analysis and diagrams, then review and refine the work together. The results stay as editable documents, workbooks, and drawings in your desktop. A saved handoff carries the context and next step into another agent session.
 
-[Open DeskInTab](https://deskintab.dgkhan08.workers.dev/) · [Run locally](#run-locally) · [Try a handoff](#try-a-project-handoff) · [70 WebMCP tools](docs/webmcp-tool-contract.md)
+[Open DeskInTab](https://deskintab.dgkhan08.workers.dev/) · [Watch the demo](https://youtu.be/42DKX0ZmOdk) · [Run locally](#run-locally) · [Try a handoff](#try-a-project-handoff) · [89 WebMCP tools](docs/webmcp-tool-contract.md)
 
 ![An editable Word release brief in Documents beside its exported PDF in Preview.](docs/images/deskintab-documents.png)
 

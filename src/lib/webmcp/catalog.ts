@@ -47,8 +47,100 @@ export function discoveryTool(tool: WebMCP.ModelContextTool): WebMCP.ModelContex
 	return {
 		...rest,
 		description,
-		inputSchema: discoverySchema(tool.inputSchema) as WebMCP.ModelContextTool['inputSchema'],
+		inputSchema: compactSchema(
+			discoverySchema(tool.inputSchema),
+		) as WebMCP.ModelContextTool['inputSchema'],
 	};
+}
+
+// Share repeated subschemas within a tool without dropping validation keywords.
+// Keep existing references/identifiers untouched: relocating their targets could
+// change resolution. Current app schemas are plain, self-contained objects.
+export function compactSchema(schema: unknown): unknown {
+	const serialized = JSON.stringify(schema);
+	if (!serialized || /"\$(?:ref|defs|id|anchor|dynamicRef|dynamicAnchor)"\s*:/.test(serialized))
+		return schema;
+	const counts = new Map<string, number>();
+	function visit(value: unknown) {
+		if (!value || typeof value !== 'object') return;
+		if (!Array.isArray(value)) {
+			const key = JSON.stringify(value);
+			counts.set(key, (counts.get(key) ?? 0) + 1);
+		}
+		mapSchemaChildren(value as Record<string, unknown>, (child) => {
+			visit(child);
+			return child;
+		});
+	}
+	visit(schema);
+	const definitions: Record<string, unknown> = {};
+	const references = new Map<string, string>();
+	function rewrite(value: unknown, root = false): unknown {
+		if (!value || typeof value !== 'object') return value;
+		const key = JSON.stringify(value);
+		const count = counts.get(key) ?? 0;
+		// Only actual schemas, not properties dictionaries or default/enum values.
+		const node = value as Record<string, unknown>;
+		if (!root && ('type' in node || 'oneOf' in node || 'anyOf' in node) && count > 1) {
+			const existing = references.get(key);
+			if (existing) return { $ref: existing };
+			const name = `s${references.size}`;
+			const ref = `#/$defs/${name}`;
+			if (
+				(count - 1) * key.length >
+				count * JSON.stringify({ $ref: ref }).length + name.length + 16
+			) {
+				references.set(key, ref);
+				definitions[name] = value;
+				return { $ref: ref };
+			}
+		}
+		return mapSchemaChildren(node, (child) => rewrite(child));
+	}
+	const result = rewrite(schema, true) as Record<string, unknown>;
+	if (!Object.keys(definitions).length) return schema;
+	const compact = { ...result, $defs: definitions };
+	return JSON.stringify(compact).length < serialized.length ? compact : schema;
+}
+
+function mapSchemaChildren(node: Record<string, unknown>, transform: (schema: unknown) => unknown) {
+	return Object.fromEntries(
+		Object.entries(node).map(([key, value]) => {
+			if (
+				['properties', 'patternProperties', '$defs', 'definitions', 'dependentSchemas'].includes(
+					key,
+				) &&
+				value &&
+				typeof value === 'object' &&
+				!Array.isArray(value)
+			) {
+				return [
+					key,
+					Object.fromEntries(
+						Object.entries(value).map(([name, child]) => [name, transform(child)]),
+					),
+				];
+			}
+			if (['allOf', 'anyOf', 'oneOf', 'prefixItems'].includes(key) && Array.isArray(value))
+				return [key, value.map(transform)];
+			if (
+				[
+					'items',
+					'additionalProperties',
+					'unevaluatedProperties',
+					'not',
+					'if',
+					'then',
+					'else',
+					'contains',
+					'propertyNames',
+					'unevaluatedItems',
+				].includes(key)
+			)
+				return [key, Array.isArray(value) ? value.map(transform) : transform(value)];
+			return [key, value];
+		}),
+	);
 }
 
 const discoveryDescriptions: Record<string, string> = {
